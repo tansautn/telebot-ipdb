@@ -88,7 +88,7 @@ export async function handleCallbackQuery(callbackQuery) {
     const meta = await storeIP({ ip, acc });
     const messageParams = {
       chat_id: chatId,
-      text: `Stored: ${input.ip} with acc: ${input.acc}${meta.lastIncrementValue}`
+      text: `Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
     };
     await bot.message.sendMessage(messageParams);
   } else if (action === 'custom') {
@@ -117,7 +117,7 @@ export async function handleCustomAccInput(message) {
     const meta = await storeIP({ ip, acc: customAcc });
     const messageParams = {
       chat_id: chatId,
-      text: `Stored: ${input.ip} with acc: ${input.acc}${meta.lastIncrementValue}`
+      text: `Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
     };
     await bot.message.sendMessage(messageParams);
   }
@@ -196,7 +196,7 @@ export async function bulkStoreCommand(body) {
     }
 
     const meta = await storeIP(entry);
-    results.push(`Stored: ${input.ip} with acc: ${input.acc}${meta.lastIncrementValue}`);
+    results.push(`Stored: ${entry.ip} with acc: ${entry.acc}${meta.lastIncrementValue}`);
   }
 
   await updateIncrementValues(); // Update increment values in metadata after bulk processing
