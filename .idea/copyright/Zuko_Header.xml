@@ -1,6 +1,0 @@
-<component name="CopyrightManager">
-  <copyright>
-    <option name="notice" value="         M&quot;&quot;&quot;&quot;&quot;&quot;&quot;&quot;`M            dP                     &#10;         Mmmmmm   .M            88                     &#10;         MMMMP  .MMM  dP    dP  88  .dP   .d8888b.     &#10;         MMP  .MMMMM  88    88  88888&quot;    88'  `88     &#10;         M' .MMMMMMM  88.  .88  88  `8b.  88.  .88     &#10;         M         M  `88888P'  dP   `YP  `88888P'     &#10;         MMMMMMMMMMM    -*-  Created by Zuko  -*-      &#10;&#10;         * * * * * * * * * * * * * * * * * * * * *     &#10;         * -    - -   F.R.E.E.M.I.N.D   - -    - *     &#10;         * -  Copyright © &amp;#36;originalComment.match(&quot;Copyright \(c\) (\d+)&quot;, 1, &quot;-&quot;, &quot;&amp;#36;today.year&quot;)&amp;#36;today.year (Z) Programing  - *     &#10;         *    -  -  All Rights Reserved  -  -    *     &#10;         * * * * * * * * * * * * * * * * * * * * *     " />
-    <option name="myName" value="Zuko Header" />
-  </copyright>
-</component>
