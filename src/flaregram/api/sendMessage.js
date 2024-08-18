@@ -42,26 +42,32 @@ export async function f_sendMessage(body) {
     protect_content: param_protect_content,
     parse_mode: param_parse_mode
   };
-
+    console.trace();
     console.log(JSON.stringify(payload));
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-
+    const aa = await response.clone().json();
+    console.log(aa);
   if (!response.ok) {
     console.error('Error sending message:', response.status, response.statusText);
-    throw new Error('Error sending message');
+
+    // throw new Error('Error sending message');
+    return response.json();
+
   }
 
-  return response;
+  return response.json();
   } catch (error){
     console.trace();
     console.error('Error in  f_sendMessage', error);
     // console.error(Error().lineNumber);
+    return {ok: false, message: 'Error in  f_sendMessage'}
+    // return response.json();
   };
 
-  return response.json()
+  return {ok: false, message: 'default return'}
 }
 

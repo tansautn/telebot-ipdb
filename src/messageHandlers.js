@@ -182,36 +182,54 @@ export async function handleInlineQuery(inlineQuery) {
 export async function bulkStoreCommand(body) {
   const chatId = body.message.chat.id;
   const lines = body.message.text.split('\n');
-
+  console.log(lines);
   clearCaches(); // Clear caches before bulk processing
 
   const results = [];
   const entries = parseInput(lines.join('\n'));
-
+  console.log(entries);
   for (const entry of entries) {
     if (!isValidIPv4(entry.ip)) {
+      console.log('case 0', entry);
       results.push(`Invalid IP: ${entry.ip}`);
       continue;
     }
 
     if (!entry.acc) {
+      console.log('case 1', entry);
       results.push(`Missing acc for IP: ${entry.ip}`);
       continue;
     }
     if (await ipExists(entry.ip)) {
+      console.log('case 2', entry);
       const result = await handleIpExist(entry, true);
-      results.push()
+      results.push(result.message);
       continue;
     }
+    console.log('normal case', entry);
     const meta = await storeIP(entry, true);
     results.push(`Stored: ${entry.ip} with acc: ${entry.acc}${meta.lastIncrementValue}`);
   }
-
+  console.log('text repsonse', results.join('\n'))
   await updateIncrementValues(); // Update increment values in metadata after bulk processing
 
-  const messageParams = {
-    chat_id: chatId,
-    text: results.join('\n')
-  };
-  await bot.message.sendMessage(messageParams);
+  const chunkSize = 150;
+  const maxMessageLength = 4096;
+
+  for (let i = 0; i < results.length; i += chunkSize) {
+    let chunk = results.slice(i, i + chunkSize).join('\n');
+
+    // If the chunk exceeds the maximum length, trim it and add "..."
+    if (chunk.length > maxMessageLength) {
+      chunk = chunk.slice(0, maxMessageLength - 3) + '...';
+    }
+
+    const messageParams = {
+      chat_id: chatId,
+      text: chunk
+    };
+
+    await bot.message.sendMessage(messageParams);
+  }
+  console.error('end of handler bulkStoreCommand');
 }

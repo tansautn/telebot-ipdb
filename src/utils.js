@@ -218,6 +218,5 @@ export function isValidUser(user_id) {
   const adminAuthApiKeys = ADMIN_AUTH_API_KEYS.split(' ');
   const merge = [...authorizedChats, ...sudoUsers, ...adminAuthApiKeys];
 
-  console.log('checking for', user_id, 'in', merge);
   return merge.includes(String(user_id));
 }
