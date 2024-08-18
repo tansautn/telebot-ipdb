@@ -23,6 +23,10 @@ export function parseInput(text) {
     const entry = {};
     headers.forEach((header, index) => {
       if (values[index]) {
+        if (header === 'acc') {
+          entry[header.trim()] = values[index].trim().toLowerCase();
+          return;
+        }
         entry[header.trim()] = values[index].trim();
       }
     });
