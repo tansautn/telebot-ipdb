@@ -2,13 +2,39 @@
 
 export const IP_DATA = globalThis.IP_DATA; // KV namespace for storing IP data
 export const METADATA_KEY = 'metadata';
-export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note'.split(',');
+export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note,dup'.split(',');
 let accIncrementCache = {};
 let ipExistenceCache = new Set();
+// {"accs":["hit","vankiepsau","tau","snw","gio","zk","ts","bl","tfo","hoa","vlo","mua","cln","te","txe","hvk","vly"],"lastIncrements":{"hit":0,"vankiepsau":0,"tau":0,"snw":0,"gio":0,"zk":0,"ts":0,"bl":0,"tfo":0,"hoa":0,"vlo":0,"mua":0,"cln":0,"te":0,"txe":0,"hvk":0,"vly":0}}
+let isMetaDataLoaded = false;
+
+let metaDataCache = {
+  accs: [],
+  lastIncrements: {},
+};
+let lastLoadMetaData = Date.now();
+export async function getMetaData() {
+  if (!isMetaDataLoaded) {
+    const metadata = await IP_DATA.get(METADATA_KEY);
+    if (metadata) {
+      lastLoadMetaData = Date.now();
+      metaDataCache = JSON.parse(metadata);
+    }
+    isMetaDataLoaded = true;
+  }
+  return metaDataCache;
+}
 
 export function clearCaches() {
   accIncrementCache = {};
   ipExistenceCache.clear();
+  if ((Date.now() - lastLoadMetaData) > (30 * 1000)){
+    metaDataCache = {
+      accs: [],
+      lastIncrements: {},
+    };
+    isMetaDataLoaded = false;
+  }
 }
 
 export function parseInput(text) {
@@ -52,16 +78,16 @@ export function isValidIPv4(ip) {
 }
 
 export async function getUniqueAccs() {
-  const metadata = await IP_DATA.get(METADATA_KEY);
+  const metadata = getMetaData();
   if (metadata) {
-    return JSON.parse(metadata).accs;
+    return metadata.accs;
   }
   return [];
 }
 
 export async function updateMetadata(newAcc) {
-  const metadata = await IP_DATA.get(METADATA_KEY);
-  let data = metadata ? JSON.parse(metadata) : { accs: [], lastIncrements: {} };
+  const metadata = await getMetaData();
+  let data = metadata ? metadata : { accs: [], lastIncrements: {} };
 
   if (!data.accs.includes(newAcc)) {
     data.accs.push(newAcc);
@@ -79,7 +105,7 @@ export async function getNextIncrementValue(acc) {
     return accIncrementCache[acc];
   }
 
-  const metadata = await IP_DATA.get(METADATA_KEY);
+  const metadata = await getMetaData();
   if (metadata) {
     const data = JSON.parse(metadata);
     if (data.lastIncrements[acc] !== undefined) {
@@ -95,8 +121,8 @@ export async function getNextIncrementValue(acc) {
 }
 
 export async function updateIncrementValues() {
-  const metadata = await IP_DATA.get(METADATA_KEY);
-  let data = metadata ? JSON.parse(metadata) : { accs: [], lastIncrements: {} };
+  const metadata = await getMetaData();
+  let data = metadata ? metadata : { accs: [], lastIncrements: {} };
 
   for (const [acc, value] of Object.entries(accIncrementCache)) {
     data.lastIncrements[acc] = value;
@@ -116,7 +142,8 @@ export async function ipExists(ip) {
   return exists;
 }
 
-export async function storeIP(entry) {
+export async function storeIP(entry, skipMetaUpdate) {
+  skipMetaUpdate = skipMetaUpdate || false;
   const { ip, acc } = entry;
   if (!entry.increment_value) {
     entry.increment_value = await getNextIncrementValue(acc);
@@ -125,6 +152,10 @@ export async function storeIP(entry) {
   const data = formatIPData(entry);
   await IP_DATA.put(key, data);
   ipExistenceCache.add(ip);
+  if (skipMetaUpdate){
+    accIncrementCache[acc] = Number(entry.increment_value);
+    return {"lastIncrementValue": entry.increment_value};
+  }
   return await updateMetadata(acc);
 }
 

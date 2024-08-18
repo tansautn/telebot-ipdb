@@ -17,7 +17,20 @@ export async function startCommand(body) {
   const rs = await bot.message.sendMessage(messageParams);
   console.log('response in start command', rs);
 }
-
+export async function handleIpExist(input, allowAdd){
+  allowAdd = allowAdd || false;
+  const existingData = await getIPData(input.ip);
+  if (allowAdd) {
+    // Add new entry
+    const result = await storeIP(input);
+    return {ok: true, message: `Updated: ${input.ip} with new acc: ${input.acc}${result.lastIncrementValue}. OLD: ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')}`};
+  }
+  return{
+    ok: true,
+    message: `!! ALREADY USED BY ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!`,
+    existItems: existingData
+  }
+}
 export async function handleIPMessage(body) {
   const chatId = body.message.chat.id;
   const input = parseInput(body.message.text.trim())[0];
@@ -32,22 +45,13 @@ export async function handleIPMessage(body) {
   }
 
   if (await ipExists(input.ip)) {
-    const existingData = await getIPData(input.ip);
-    if (input.acc) {
-      // Add new entry
-      await storeIP(input);
-      const messageParams = {
-        chat_id: chatId,
-        text: `Updated: ${input.ip} with new acc: ${input.acc}`
-      };
-      await bot.message.sendMessage(messageParams);
-    } else {
-      const messageParams = {
-        chat_id: chatId,
-        text: `Existing data for ${input.ip}:\n${existingData.map(d => `${d.acc}${d.increment_value}: ${d.note || 'No note'}`).join('\n')}`
-      };
-      await bot.message.sendMessage(messageParams);
+    const result = await handleIpExist(input);
+    const messageParams = {
+      chat_id: chatId,
+      text: result.message,
+      parse_mode: "markdown",
     }
+    await bot.message.sendMessage(messageParams);
   } else {
     if (!input.acc) {
       // Get unique accs
@@ -117,7 +121,7 @@ export async function handleCustomAccInput(message) {
     const meta = await storeIP({ ip, acc: customAcc });
     const messageParams = {
       chat_id: chatId,
-      text: `Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
+      text: `Stored: ${ip} with acc: ${customAcc}${meta.lastIncrementValue}`
     };
     await bot.message.sendMessage(messageParams);
   }
@@ -194,8 +198,12 @@ export async function bulkStoreCommand(body) {
       results.push(`Missing acc for IP: ${entry.ip}`);
       continue;
     }
-
-    const meta = await storeIP(entry);
+    if (await ipExists(entry.ip)) {
+      const result = await handleIpExist(entry, true);
+      results.push()
+      continue;
+    }
+    const meta = await storeIP(entry, true);
     results.push(`Stored: ${entry.ip} with acc: ${entry.acc}${meta.lastIncrementValue}`);
   }
 
