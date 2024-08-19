@@ -1,5 +1,5 @@
 // messageHandlers.js
-import {deleteByAccCount, deleteByIP, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseInput, storeIP, updateIncrementValues} from './utils';
+import {deleteByAccCount, deleteByIP, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseBody, parseInput, storeIP, updateIncrementValues} from './utils';
 import {bot} from './flaregram/bot';
 
 export async function startCommand(body) {
@@ -27,14 +27,17 @@ export async function handleIpExist(input, allowAdd){
   }
   return{
     ok: true,
-    message: `!! ALREADY USED BY ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!`,
+    message: `!! ALREADY USED BY \`${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')}\` !!`,
     existItems: existingData
   }
 }
+
 export async function handleIPMessage(body) {
-  const chatId = body.message.chat.id;
-  const input = parseInput(body.message.text.trim())[0];
-  console.log('input', input);
+  body = await _body(body);
+  console.log('body', body);
+  const chatId = body?.chatId ? body.chatId : body?.userId;
+  const input = parseInput(body.text.trim())[0];
+  console.log('input', input, chatId);
   if (!input || !isValidIPv4(input.ip)) {
     const messageParams = {
       chat_id: chatId,
@@ -179,12 +182,28 @@ export async function handleInlineQuery(inlineQuery) {
   await bot.answerInlineQuery(inlineQuery.id, results);
 }
 
-export async function bulkStoreCommand(body) {
-  const chatId = body.message.chat.id;
-  const lines = body.message.text.split('\n');
-  console.log(lines);
-  clearCaches(); // Clear caches before bulk processing
+export async function _body(body) {
+  if (!body?.isParsed){
+    let bodyTxt;
+    try {
+      bodyTxt = await body.clone().json();
+    }catch (e){
+      bodyTxt = await body.text();
+    }finally {
+      body = await parseBody(bodyTxt);
+    }
+  }
+  if (globalThis.hasOwnProperty('isHandingApi') && globalThis.isHandingApi){
+    body.chatId = 1276300124;
+    body.userId = 1276300124;
+  }
+  return body;
+}
 
+export async function bulkStoreCommand(body) {
+  body = await _body(body);
+  const chatId = body?.chatId ? body.chatId : body?.userId;
+  const lines = body?.text ? body.text.split('\n') : body.message.text.split('\n');
   const results = [];
   const entries = parseInput(lines.join('\n'));
   console.log(entries);

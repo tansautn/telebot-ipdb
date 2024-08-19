@@ -1,6 +1,6 @@
 import {router} from './flaregram/utils/router';
-import {bulkStoreCommand, handleCallbackQuery, handleCustomLabelInput, handleDeleteCommand, handleInlineQuery, handleIPMessage, startCommand} from './messageHandlers';
-import {deleteByIP, deleteByLabelCount, getLabelsWithLastIncrements, isValidIPv4, isValidUser} from './utils';
+import {_body, bulkStoreCommand, handleCallbackQuery, handleCustomLabelInput, handleDeleteCommand, handleInlineQuery, handleIPMessage, startCommand} from './messageHandlers';
+import {deleteByIP, deleteByLabelCount, getLabelsWithLastIncrements, isValidIPv4, isValidUser, parseBody} from './utils';
 
 // Main update handler for Telegram webhook
 export async function updateHandler(obj) {
@@ -50,13 +50,14 @@ export function getApiKeyFromRequest(request) {
 // API endpoint handler
 async function apiHandler(request) {
   const { method } = request;
+  const body = await _body(request);
   const url = (new URL(request.url)).pathname.replace(/^\/api/, '');
   // Implement authentication for API requests
   const apiKey = getApiKeyFromRequest(request);
   if (!apiKey || !isValidUser(apiKey)) {
     return new Response('Unauthorized', { status: 401 });
   }
-
+  globalThis.isHandingApi = true;
   switch (method) {
     case 'GET':
       if (url.startsWith('/labels')) {
@@ -65,10 +66,7 @@ async function apiHandler(request) {
       }
       break;
     case 'POST':
-      const asw = request.clone();
-      const wdd = await asw.json();
-      console.log('request body', wdd);
-      const body = await request.json();
+      // const body = await parseBody(bodyText);
       if (url.startsWith('/ip')) {
         await handleIPMessage(body);
         return new Response(JSON.stringify({ok: true}), { status: 200 });

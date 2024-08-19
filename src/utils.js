@@ -222,3 +222,44 @@ export function isValidUser(user_id) {
 
   return merge.includes(String(user_id));
 }
+
+export async function parseBody(body, noMore = false) {
+  let params;
+  const DEFAULT_INCOMING_MSG = `{"message":{"from":{"id":1276300124},"chat":{"id":1276300124},"text":""}}`;
+  if (typeof body === 'object' && body?.message.hasOwnProperty('text')) {
+    params = {...JSON.parse(`${DEFAULT_INCOMING_MSG}`), ...body};
+    if (body?.message?.chat?.id){
+      params['chatId'] = body.message.chat.id;
+    }
+    if (body?.message?.from?.id){
+      params['userId'] = body.message.from.id;
+    }
+  }else{
+    // console.log(body);
+    // console.log(typeof body);
+    if(typeof body !== 'string'){
+      console.log(typeof body?.text);
+      if (typeof body?.text !== 'string'){
+        body = await body.text();
+        body = {text: body, message: {text: body},};
+      }
+      body = JSON.stringify(body);
+    }
+    try {
+      body = JSON.parse(`${body}`);
+    } catch (e) {
+      console.log('parseBody error', e);
+      console.log('ORG', body);
+      body = {text: body, message: {text: body},};
+    } finally {
+      params = {...JSON.parse(`${DEFAULT_INCOMING_MSG}`), ...body};
+      if (!noMore) {
+        params = await parseBody(body, true)
+      }
+    }
+  }
+
+  console.log('b4 return', params);
+  params.isParsed = true;
+  return params;
+}
