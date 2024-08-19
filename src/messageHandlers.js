@@ -1,7 +1,6 @@
 // messageHandlers.js
-import { IP_DATA, METADATA_KEY } from './utils';
-import { isValidIPv4, parseInput, formatIPData, parseIPData, getUniqueAccs, deleteByAccCount, deleteByIP, storeIP, ipExists, getIPData, clearCaches, updateIncrementValues } from './utils';
-import { bot } from './flaregram/bot';
+import {deleteByAccCount, deleteByIP, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseInput, storeIP, updateIncrementValues} from './utils';
+import {bot} from './flaregram/bot';
 
 export async function startCommand(body) {
   const user_id = body.message.from.id;
@@ -20,6 +19,7 @@ export async function startCommand(body) {
 export async function handleIpExist(input, allowAdd){
   allowAdd = allowAdd || false;
   const existingData = await getIPData(input.ip);
+  console.log('exsistingData', existingData);
   if (allowAdd) {
     // Add new entry
     const result = await storeIP(input);
@@ -34,7 +34,7 @@ export async function handleIpExist(input, allowAdd){
 export async function handleIPMessage(body) {
   const chatId = body.message.chat.id;
   const input = parseInput(body.message.text.trim())[0];
-
+  console.log('input', input);
   if (!input || !isValidIPv4(input.ip)) {
     const messageParams = {
       chat_id: chatId,

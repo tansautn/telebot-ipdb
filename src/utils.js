@@ -1,39 +1,103 @@
 // utils.js
 
-export const IP_DATA = globalThis.IP_DATA; // KV namespace for storing IP data
-export const METADATA_KEY = 'metadata';
+import { getSheetData, appendRow, updateRow, deleteRow } from './googleSheetsUtils';
+export const googleSrvAccount = JSON.parse(GOOGLE_SERV_ACC_JSON);
 export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note,dup'.split(',');
-let accIncrementCache = {};
-let ipExistenceCache = new Set();
-// {"accs":["hit","vankiepsau","tau","snw","gio","zk","ts","bl","tfo","hoa","vlo","mua","cln","te","txe","hvk","vly"],"lastIncrements":{"hit":0,"vankiepsau":0,"tau":0,"snw":0,"gio":0,"zk":0,"ts":0,"bl":0,"tfo":0,"hoa":0,"vlo":0,"mua":0,"cln":0,"te":0,"txe":0,"hvk":0,"vly":0}}
-let isMetaDataLoaded = false;
+export const HEADER_ROW = 1;
 
-let metaDataCache = {
-  accs: [],
-  lastIncrements: {},
-};
-let lastLoadMetaData = Date.now();
 export async function getMetaData() {
-  if (!isMetaDataLoaded) {
-    const metadata = await IP_DATA.get(METADATA_KEY);
-    if (metadata) {
-      lastLoadMetaData = Date.now();
-      metaDataCache = JSON.parse(metadata);
-    }
-    isMetaDataLoaded = true;
-  }
-  return metaDataCache;
+  const sheetData = await getSheetData();
+  const accs = new Set();
+  const lastIncrements = {};
+
+  sheetData.forEach(row => {
+    const acc = row[1];
+    const incrementValue = parseInt(row[2]);
+    accs.add(acc);
+    lastIncrements[acc] = Math.max(lastIncrements[acc] || 0, incrementValue);
+  });
+
+  return {
+    accs: Array.from(accs),
+    lastIncrements,
+  };
 }
 
-export function clearCaches() {
-  accIncrementCache = {};
-  ipExistenceCache.clear();
-  if ((Date.now() - lastLoadMetaData) > (30 * 1000)){
-    metaDataCache = {
-      accs: [],
-      lastIncrements: {},
-    };
-    isMetaDataLoaded = false;
+export async function ipExists(ip) {
+  const sheetData = await getSheetData();
+  return sheetData.some(row => row[0] === ip);
+}
+
+export async function storeIP(entry) {
+  const { ip, acc } = entry;
+  const sheetData = await getSheetData();
+  const existingRowIndex = sheetData.findIndex(row => row[0] === ip && row[1] === acc);
+
+  if (existingRowIndex !== -1) {
+    // Update existing row
+    const updatedRow = [...sheetData[existingRowIndex]];
+    HEADERS.forEach((header, index) => {
+      if (entry[header]) {
+        updatedRow[index] = entry[header];
+      }
+    });
+    await updateRow(existingRowIndex + HEADER_ROW + 1, updatedRow);
+  } else {
+    // Append new row
+    const newRow = HEADERS.map(header => entry[header] || '');
+    await appendRow(newRow);
+  }
+
+  const metadata = await getMetaData();
+  return { lastIncrementValue: metadata.lastIncrements[acc] || 0 };
+}
+
+export async function getIPData(ip) {
+  const sheetData = await getSheetData();
+  return sheetData
+    .filter(row => row[0] === ip)
+    .map(row => {
+      const entry = {};
+      HEADERS.forEach((header, index) => {
+        entry[header] = row[index];
+      });
+      return entry;
+    });
+}
+
+export async function deleteByAccCount(acc, count) {
+  const sheetData = await getSheetData();
+  let deletedCount = 0;
+
+  for (let i = sheetData.length - 1; i >= 0; i--) {
+    if (sheetData[i][1] === acc && sheetData[i][2] === count.toString()) {
+      await deleteRow(i + HEADER_ROW + 1);
+      deletedCount++;
+    }
+  }
+
+  if (deletedCount > 0) {
+    return { success: true, message: `Successfully deleted ${deletedCount} entries with acc ${acc}${count}` };
+  } else {
+    return { success: false, message: `No entries found with acc ${acc}${count}` };
+  }
+}
+
+export async function deleteByIP(ip) {
+  const sheetData = await getSheetData();
+  let deletedCount = 0;
+
+  for (let i = sheetData.length - 1; i >= 0; i--) {
+    if (sheetData[i][0] === ip) {
+      await deleteRow(i + HEADER_ROW + 1);
+      deletedCount++;
+    }
+  }
+
+  if (deletedCount > 0) {
+    return { success: true, message: `Successfully deleted all entries for IP ${ip}` };
+  } else {
+    return { success: false, message: `No entries found for IP ${ip}` };
   }
 }
 
@@ -41,7 +105,7 @@ export function parseInput(text) {
   const lines = text.split('\n');
   const headers = HEADERS;
 
-  return lines.slice(1).map(line => {
+  return lines.map(line => {
     if (line.trim().startsWith('/') || line.trim().startsWith('#') || !line.trim()) {
       return null; // Skip comments and empty lines
     }
@@ -78,8 +142,8 @@ export function isValidIPv4(ip) {
 }
 
 export async function getUniqueAccs() {
-  const metadata = getMetaData();
-  if (metadata) {
+  const metadata = await getMetaData();
+  if (metadata && metadata.accs) {
     return metadata.accs;
   }
   return [];
@@ -131,69 +195,7 @@ export async function updateIncrementValues() {
   await IP_DATA.put(METADATA_KEY, JSON.stringify(data));
 }
 
-export async function ipExists(ip) {
-  if (ipExistenceCache.has(ip)) {
-    return true;
-  }
-  const exists = await IP_DATA.get(ip) !== null;
-  if (exists) {
-    ipExistenceCache.add(ip);
-  }
-  return exists;
-}
-
-export async function storeIP(entry, skipMetaUpdate) {
-  skipMetaUpdate = skipMetaUpdate || false;
-  const { ip, acc } = entry;
-  if (!entry.increment_value) {
-    entry.increment_value = await getNextIncrementValue(acc);
-  }
-  const key = `${ip}:${acc}${entry.increment_value}`;
-  const data = formatIPData(entry);
-  await IP_DATA.put(key, data);
-  ipExistenceCache.add(ip);
-  if (skipMetaUpdate){
-    accIncrementCache[acc] = Number(entry.increment_value);
-    return {"lastIncrementValue": entry.increment_value};
-  }
-  return await updateMetadata(acc);
-}
-
-export async function getIPData(ip) {
-  const keys = await IP_DATA.list({ prefix: `${ip}:` });
-  const data = await Promise.all(keys.keys.map(key => IP_DATA.get(key.name)));
-  return data.map(parseIPData);
-}
-
-export async function deleteByAccCount(acc, count) {
-  const allKeys = await IP_DATA.list();
-  let deletedCount = 0;
-
-  for (const key of allKeys.keys) {
-    if (key.name.endsWith(`:${acc}${count}`)) {
-      await IP_DATA.delete(key.name);
-      deletedCount++;
-    }
-  }
-
-  if (deletedCount > 0) {
-    return { success: true, message: `Successfully deleted ${deletedCount} entries with acc ${acc}${count}` };
-  } else {
-    return { success: false, message: `No entries found with acc ${acc}${count}` };
-  }
-}
 export const deleteByLabelCount = deleteByAccCount;
-export async function deleteByIP(ip) {
-  const keys = await IP_DATA.list({ prefix: `${ip}:` });
-  if (keys.keys.length > 0) {
-    await Promise.all(keys.keys.map(key => IP_DATA.delete(key.name)));
-    ipExistenceCache.delete(ip);
-    return { success: true, message: `Successfully deleted all entries for IP ${ip}` };
-  } else {
-    return { success: false, message: `No entries found for IP ${ip}` };
-  }
-}
-
 export async function getLabelsWithLastIncrements() {
   const allIPs = await IP_DATA.list();
   const labelMap = new Map();
