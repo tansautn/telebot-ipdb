@@ -2,7 +2,8 @@ import { googleSrvAccount } from './utils';
 import * as jose from 'jose';
 
 const SHEET_ID = '1FNghXAdaflNSyQEaeR9H3JlgntpuuzvhQ9HHH3YvV18';
-const SHEET_NAME = 'Ip';
+const SHEET_NAME_IP = 'Ip';
+const SHEET_NAME_THU_CHI = 'Thu chi';
 const HEADER_ROW = 1;
 
 async function getAccessToken() {
@@ -49,10 +50,15 @@ async function getAccessToken() {
   }
 }
 
-// The rest of the functions remain the same
-async function sheetsRequest(method, endpoint, body = null) {
+async function sheetsRequest(method, endpoint, body = null, params = null) {
   const accessToken = await getAccessToken();
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/${endpoint}`;
+  let url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/${endpoint}`;
+
+  if (params) {
+    const queryParams = new URLSearchParams(params);
+    url += `?${queryParams.toString()}`;
+  }
+
   const options = {
     method,
     headers: {
@@ -60,33 +66,45 @@ async function sheetsRequest(method, endpoint, body = null) {
       'Content-Type': 'application/json'
     }
   };
+
   if (body) {
     options.body = JSON.stringify(body);
   }
+
   const response = await fetch(url, options);
   const data = await response.json();
+
   if (!response.ok) {
     console.error('Sheets API Error:', data);
     throw new Error(`Sheets API Error: ${data.error.message}`);
   }
+
   return data;
 }
 
+
+
+
 export async function getSheetData() {
-  const response = await sheetsRequest('GET', `values/${SHEET_NAME}!A${HEADER_ROW + 1}:Z`);
+  const response = await sheetsRequest('GET', `values/${SHEET_NAME_IP}!A${HEADER_ROW + 1}:Z`);
   return response.values || [];
 }
 
 export async function appendRow(values) {
-  await sheetsRequest('POST', `values/${SHEET_NAME}!A${HEADER_ROW + 1}:Z:append`, {
+  const params = {
     valueInputOption: 'USER_ENTERED',
-    insertDataOption: 'INSERT_ROWS',
+    insertDataOption: 'INSERT_ROWS'
+  };
+
+  const body = {
     values: [values]
-  });
+  };
+
+  await sheetsRequest('POST', `values/${SHEET_NAME_IP}!A${HEADER_ROW + 1}:Z:append`, body, params);
 }
 
 export async function updateRow(rowIndex, values) {
-  await sheetsRequest('PUT', `values/${SHEET_NAME}!A${rowIndex}:Z${rowIndex}`, {
+  await sheetsRequest('PUT', `values/${SHEET_NAME_IP}!A${rowIndex}:Z${rowIndex}`, {
     valueInputOption: 'USER_ENTERED',
     values: [values]
   });

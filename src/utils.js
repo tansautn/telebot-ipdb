@@ -4,19 +4,18 @@ import { getSheetData, appendRow, updateRow, deleteRow } from './googleSheetsUti
 export const googleSrvAccount = JSON.parse(GOOGLE_SERV_ACC_JSON);
 export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note,dup'.split(',');
 export const HEADER_ROW = 1;
-
+export const EXCLUDED_ACCS = 'cex,cln,hoa,mua,tc,te,tha,txe,vankiepsau,vly'.split(',');
+globalThis.accs = new Set();
+globalThis.lastIncrements = {};
 export async function getMetaData() {
   const sheetData = await getSheetData();
-  const accs = new Set();
-  const lastIncrements = {};
-
   sheetData.forEach(row => {
-    const acc = row[1];
+    const acc = row[1]?.toLowerCase();
     const incrementValue = parseInt(row[2]);
-    accs.add(acc);
+    acc && accs.add(acc);
     lastIncrements[acc] = Math.max(lastIncrements[acc] || 0, incrementValue);
   });
-
+  console.log(Array.from(accs), lastIncrements);
   return {
     accs: Array.from(accs),
     lastIncrements,
@@ -32,7 +31,8 @@ export async function storeIP(entry) {
   const { ip, acc } = entry;
   const sheetData = await getSheetData();
   const existingRowIndex = sheetData.findIndex(row => row[0] === ip && row[1] === acc);
-
+  const nextIncrement = await getNextIncrementValue(acc);
+  entry.increment_value = nextIncrement;
   if (existingRowIndex !== -1) {
     // Update existing row
     const updatedRow = [...sheetData[existingRowIndex]];
@@ -164,24 +164,24 @@ export async function updateMetadata(newAcc) {
 
 
 export async function getNextIncrementValue(acc) {
-  if (accIncrementCache[acc] !== undefined) {
-    accIncrementCache[acc]++;
-    return accIncrementCache[acc];
+  if (lastIncrements[acc] !== undefined) {
+    lastIncrements[acc]++;
+    return lastIncrements[acc];
   }
 
   const metadata = await getMetaData();
   if (metadata) {
     const data = JSON.parse(metadata);
     if (data.lastIncrements[acc] !== undefined) {
-      accIncrementCache[acc] = data.lastIncrements[acc] + 1;
+      lastIncrements[acc] = data.lastIncrements[acc] + 1;
     } else {
-      accIncrementCache[acc] = 1;
+      lastIncrements[acc] = 1;
     }
   } else {
-    accIncrementCache[acc] = 1;
+    lastIncrements[acc] = 1;
   }
 
-  return accIncrementCache[acc];
+  return lastIncrements[acc];
 }
 
 export async function updateIncrementValues() {

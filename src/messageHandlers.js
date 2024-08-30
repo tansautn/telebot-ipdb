@@ -1,5 +1,5 @@
 // messageHandlers.js
-import {deleteByAccCount, deleteByIP, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseInput, storeIP, updateIncrementValues} from './utils';
+import {deleteByAccCount, deleteByIP, EXCLUDED_ACCS, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseInput, storeIP, updateIncrementValues} from './utils';
 import {bot} from './flaregram/bot';
 
 export async function startCommand(body) {
@@ -55,7 +55,7 @@ export async function handleIPMessage(body) {
   } else {
     if (!input.acc) {
       // Get unique accs
-      const accs = await getUniqueAccs();
+      const accs = (await getUniqueAccs()).filter(acc => (EXCLUDED_ACCS.indexOf(acc) === -1));
 
       // Create inline keyboard with existing accs
       const keyboard = accs.map(acc => [{text: acc, callback_data: `acc:${input.ip}:${acc}`}]);
@@ -91,12 +91,14 @@ export async function handleCallbackQuery(callbackQuery) {
   if (action === 'acc') {
     const meta = await storeIP({ ip, acc });
     const messageParams = {
+      id: id,
       chat_id: chatId,
       text: `Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
     };
     await bot.message.sendMessage(messageParams);
   } else if (action === 'custom') {
     const messageParams = {
+      id: id,
       chat_id: chatId,
       text: `Please enter a custom acc for IP ${ip}:`,
       reply_markup: JSON.stringify({
