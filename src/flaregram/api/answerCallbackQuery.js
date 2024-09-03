@@ -23,7 +23,7 @@ export async function f_answerCallbackQuery(body) {
   const param_show_alert = body.show_alert == undefined?'False':body.show_alert;
   const param_cache_time = body.cache_time == undefined?'':body.cache_time;
   const param_url = body.url == undefined?'':body.url; // would only work if the callback comes from a callback_game button.
-
+  const reply_markup = body.reply_markup == undefined?'':body.reply_markup;
   const payload = {
     // required
     callback_query_id: param_id,
@@ -33,7 +33,9 @@ export async function f_answerCallbackQuery(body) {
     cache_time: param_cache_time,
     url: param_url,
   };
-    
+  if(reply_markup){
+    payload['reply_markup'] = reply_markup
+  }
 
   const response = await fetch(API_URL, {
     method: 'POST',

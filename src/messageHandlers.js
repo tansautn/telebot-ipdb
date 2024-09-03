@@ -85,17 +85,24 @@ export async function handleIPMessage(body) {
 export async function handleCallbackQuery(callbackQuery) {
   const { id, data, message } = callbackQuery;
   const chatId = message.chat.id;
-
+  const messageId = callbackQuery.message.message_id;
   const [action, ip, acc] = data.split(':');
+  await bot.message.answerCallbackQuery({callback_query_id: id});
 
   if (action === 'acc') {
     const meta = await storeIP({ ip, acc });
     const messageParams = {
       id: id,
       chat_id: chatId,
+      callback_query_id: id,
+      message_id: messageId,
       text: `Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
     };
+//    await bot.editMessageReplyMarkup(messageParams);
+    const txtRes = await bot.message.deleteMessages({chat_id: chatId, message_id: messageId});
+    messageParams.text += `\n${JSON.stringify(await txtRes.json())}`;
     await bot.message.sendMessage(messageParams);
+//    await bot.message.answerCallbackQuery(messageParams);
   } else if (action === 'custom') {
     const messageParams = {
       id: id,
@@ -110,7 +117,7 @@ export async function handleCallbackQuery(callbackQuery) {
   }
 
   // Answer the callback query to remove the "loading" state of the button
-  await bot.message.answerCallbackQuery({id: id});
+//  await bot.message.answerCallbackQuery({callback_query_id: id});
 }
 
 export async function handleCustomAccInput(message) {
