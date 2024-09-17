@@ -1,13 +1,61 @@
-import {router} from './flaregram/utils/router';
-import {bulkStoreCommand, handleCallbackQuery, handleCustomLabelInput, handleDeleteCommand, handleInlineQuery, handleIPMessage, startCommand} from './messageHandlers';
-import {deleteByIP, deleteByLabelCount, getLabelsWithLastIncrements, isValidIPv4, isValidUser} from './utils';
+import { router } from './flaregram/utils/router';
+import { bulkStoreCommand, handleCallbackQuery, handleCustomLabelInput, handleDeleteCommand, handleInlineQuery, handleIPMessage, startCommand } from './messageHandlers';
+import {checkOvpnConnection, parseOpenVPNConfig} from './ovpnChecker'; // Assuming ovpnChecker has checkVPNServer function
+import {
+  deleteByIP,
+  deleteByLabelCount,
+  getChatIdFromUpdateObj,
+  getLabelsWithLastIncrements,
+  isValidIPv4,
+  isValidUser
+} from './utils';
+import {bot} from "./flaregram/bot";
 
+
+// Function to handle OVPN file
+async function handleOVPNFile(obj) {
+  const document = obj.message.document;
+
+  if (document.file_name.endsWith('.ovpn')) {
+    // Retrieve the file data
+    try {
+      const fileContent  = await bot.getFileContentById(document.file_id);
+      const ovpnConfig = parseOpenVPNConfig(fileContent);
+      const { remoteInfo, protocol } = ovpnConfig; // Extract remote server info
+      const {host: remoteHost} = remoteInfo;
+      // Check the availability of the remote server
+      const isAvailable = await checkOvpnConnection(ovpnConfig);
+
+      if (isAvailable) {
+        obj.message.note = `Connected to ${remoteHost} via ${protocol}`;
+        obj.message.text = `${remoteHost}`;
+        // If server is available, handle as IP message
+        await handleIPMessage(obj);
+      } else {
+        // If not available, send an error message
+        await bot.sendMessage({
+          chat_id: getChatIdFromUpdateObj(obj),
+          text: `Could not connect to ${remoteHost} via ${protocol}`,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      await bot.sendMessage({
+        chat_id: getChatIdFromUpdateObj(obj),
+        text: 'Error ocurred \n' + e.message,
+      });
+    }
+  }
+}
 // Main update handler for Telegram webhook
 export async function updateHandler(obj) {
   console.log('incoming update', obj);
   if (obj.message) {
     console.info("Incoming msg obj", obj.message);
-    if (obj.message.reply_to_message && obj.message.reply_to_message.text.startsWith('Please enter a custom label for IP')) {
+    console.log('obj.message.document?.file_id', obj.message.document?.file_idx);
+    if (obj.message.document?.file_id) {
+      await handleOVPNFile(obj);
+    }else if (obj.message.reply_to_message && obj.message.reply_to_message.text.startsWith('Please enter a custom label for IP')) {
       await handleCustomLabelInput(obj.message);
     } else {
       switch (true) {
@@ -135,17 +183,17 @@ addEventListener('fetch', (event) => {
   const startTime = Date.now();
   const {request} = event;
   console.log(`[${new Date().toISOString()}] ${request.method} ${request?.url?.pathname}`);
-  console.info('EVENT: ', event);
+  // console.info('EVENT: ', event);
   try {
-    const response = router.handle(event.request);
+    const response = router.handle(request);
     // event.waitUntil(logRequestDetails(event.request, response, startTime));
     console.info('END -----------------------------');
     console.info('---------------------------------');
     event.respondWith(response);
   } catch (error) {
+    console.error('Error processing request:', error);
     // event.waitUntil(logError(event.request, error, startTime));
     console.trace();
-    console.error(error);
     event.respondWith(new Response('Internal Server Error', { status: 500 }));
   }
 });

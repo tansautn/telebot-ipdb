@@ -32,18 +32,21 @@
  */
 export async function f_getFileContent(message) {
   if (message && message.document) {
-    const fileId = message.document.file_id;
-    const botToken = BOT_TOKEN;
-
-    // Get file path
-    const getFileUrl = `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`;
-    const fileInfo = await fetch(getFileUrl).then(res => res.json());
-    const filePath = fileInfo.result.file_path;
-
-    // Download file content
-    const fileUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
-    const fileContent = await fetch(fileUrl).then(res => res.text());
-    return fileContent;
+    return await getFileContentByFileId(message.document.file_id);
   }
   throw new Error('File not found in request body');
+}
+
+export async function getFileContentByFileId(fileId) {
+  const botToken = BOT_TOKEN;
+
+  // Get file path
+  const getFileUrl = `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`;
+  const fileInfo = await fetch(getFileUrl).then(res => res.json());
+  const filePath = fileInfo.result.file_path;
+
+  // Download file content
+  const fileUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
+  const fileContent = await fetch(fileUrl).then(res => res.text());
+  return fileContent;
 }

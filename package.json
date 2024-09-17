@@ -4,12 +4,13 @@
   "main": "index.js",
   "scripts": {
     "deploy": "wrangler deploy",
-    "start": "wrangler dev --remote"
+    "start": "wrangler dev --remote",
+    "tail" : "wrangler tail"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20230419.0",
     "typescript": "^5.0.4",
-    "wrangler": "^3.30.1"
+    "wrangler": "^3.47.0"
   },
   "dependencies": {
     "google-spreadsheet": "^4.1.2",

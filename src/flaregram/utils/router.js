@@ -1,7 +1,7 @@
 //// flaregram © 2024 by Aditya Sharma is licensed under Attribution-NonCommercial 4.0 International. To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/4.0/
 
 import {updateHandler} from '../../index';
-import {isValidUser} from '../../utils';
+import {getChatIdFromUpdateObj, isValidUser} from '../../utils';
 import { setWebhook } from './webhook';
 import {  colors, status_good, status_bad } from './strings.js';
 
@@ -73,19 +73,16 @@ const router = {
 };
 // Function to process '/bot' route
 async function handleBotRequest(update) {
-  console.log('update', update);
   const data = await update.json();
   try {
     const token = update.headers.get('X-Telegram-Bot-Api-Secret-Token');
 
     //const { method, body } = request;
-    console.log(data);
-    if (isValidUser(data.message?.chat?.id)
-      || isValidUser(data.message?.from?.id)
-      || isValidUser(data.callback_query?.chat?.id)
-      || isValidUser(data.callback_query?.from?.id)
-      || isValidUser(data.inline_query?.chat?.id)
-      || isValidUser(data.inline_query?.from?.id)) {
+    const uid = getChatIdFromUpdateObj(data, true);
+    console.info(
+        'uid', uid
+    );
+    if (isValidUser(uid)) {
       console.log(
         `SERVER: Incoming ${colors.yellow}SECRET_TOKEN${colors.white} has been verified [ ${colors.green}${token}${colors.white} ]`
       );
@@ -93,6 +90,9 @@ async function handleBotRequest(update) {
       /*const rs = */await updateHandler(data);
       return new Response(JSON.stringify({ ok: true ,input: data}), { status: 200 });
     }
+    console.log(
+        `SERVER: Incoming ${colors.yellow}SECRET_TOKEN${colors.white} not verified`
+    );
   } catch (error) {
     console.trace();
     console.log(error.stack);
