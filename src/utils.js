@@ -153,7 +153,16 @@ export function parseInput(text) {
         if (line.trim().startsWith('/') || line.trim().startsWith('#') || !line.trim()) {
             return null; // Skip comments and empty lines
         }
-        const values = line.split(',');
+        let delim;
+        const allowedDelims = [' ', '\t', ',', '|'];
+        for (let i = 0; i < allowedDelims.length; i++) {
+            let curDelim = allowedDelims[i];
+            if (line.trim().includes(curDelim)) {
+                delim = curDelim;
+                break;
+            }
+        }
+        const values = line.split(delim || ' ');
         const entry = {};
         headers.forEach((header, index) => {
             if (values[index]) {
@@ -215,7 +224,12 @@ export async function getNextIncrementValue(acc) {
 
     const metadata = await getMetaData();
     if (metadata) {
-        const data = JSON.parse(metadata);
+        let data;
+        if (typeof metadata === 'string') { // for backward compatibility
+            data = JSON.parse(metadata);
+        } else {
+            data = metadata;
+        }
         if (data.lastIncrements[acc] !== undefined) {
             lastIncrements[acc] = data.lastIncrements[acc] + 1;
         } else {
