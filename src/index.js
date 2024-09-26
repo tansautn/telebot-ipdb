@@ -1,61 +1,22 @@
 import { router } from './flaregram/utils/router';
 import { bulkStoreCommand, handleCallbackQuery, handleCustomLabelInput, handleDeleteCommand, handleInlineQuery, handleIPMessage, startCommand } from './messageHandlers';
-import {checkOvpnConnection, parseOpenVPNConfig} from './ovpnChecker'; // Assuming ovpnChecker has checkVPNServer function
 import {
   deleteByIP,
   deleteByLabelCount,
-  getChatIdFromUpdateObj,
   getLabelsWithLastIncrements,
   isValidIPv4,
   isValidUser
 } from './utils';
-import {bot} from "./flaregram/bot";
+import {getConfig} from "./configProvider";
 
 
 // Function to handle OVPN file
-async function handleOVPNFile(obj) {
-  const document = obj.message.document;
 
-  if (document.file_name.endsWith('.ovpn')) {
-    // Retrieve the file data
-    try {
-      const fileContent  = await bot.getFileContentById(document.file_id);
-      const ovpnConfig = parseOpenVPNConfig(fileContent);
-      const { remoteInfo, protocol } = ovpnConfig; // Extract remote server info
-      const {host: remoteHost} = remoteInfo;
-      // Check the availability of the remote server
-      const isAvailable = await checkOvpnConnection(ovpnConfig);
-
-      if (isAvailable) {
-        obj.message.note = `Connected to ${remoteHost} via ${protocol}`;
-        obj.message.text = `${remoteHost}`;
-        // If server is available, handle as IP message
-        await handleIPMessage(obj);
-      } else {
-        // If not available, send an error message
-        await bot.sendMessage({
-          chat_id: getChatIdFromUpdateObj(obj),
-          text: `Could not connect to ${remoteHost} via ${protocol}`,
-        });
-      }
-    } catch (e) {
-      console.error(e);
-      await bot.sendMessage({
-        chat_id: getChatIdFromUpdateObj(obj),
-        text: 'Error ocurred \n' + e.message,
-      });
-    }
-  }
-}
 // Main update handler for Telegram webhook
 export async function updateHandler(obj) {
   console.log('incoming update', obj);
   if (obj.message) {
-    console.info("Incoming msg obj", obj.message);
-    console.log('obj.message.document?.file_id', obj.message.document?.file_idx);
-    if (obj.message.document?.file_id) {
-      await handleOVPNFile(obj);
-    }else if (obj.message.reply_to_message && obj.message.reply_to_message.text.startsWith('Please enter a custom label for IP')) {
+    if (obj.message.reply_to_message && obj.message.reply_to_message.text.startsWith(getConfig('labels.askForCustomAcc'))) {
       await handleCustomLabelInput(obj.message);
     } else {
       switch (true) {
@@ -175,7 +136,40 @@ async function handleGetLabels() {
     });
   }
 }
-
+router.any('/dev', async function (request) {
+  if (!request.headers.has('X-Zuko-Debug')) {
+      return new Response('Unauthorized', { status: 401 });
+  }
+  const obj = {
+    "update_id": 535670323,
+    "message": {
+      "message_id": 607,
+      "from": {
+        "id": 1276300124,
+        "is_bot": false,
+        "first_name": "Ƶ𝔲𝔨𝔬",
+        "last_name": "🔥",
+        "username": "zukotnn",
+        "language_code": "vi"
+      },
+      "chat": {
+        "id": -1002213557605,
+        "title": "IPDB",
+        "type": "supergroup"
+      },
+      "date": 1726719367,
+      "document": {
+        "file_name": "VN_vpn213108604.ovpn",
+        "mime_type": "application/octet-stream",
+        "file_id": "BQACAgUAAyEFAASD8DVlAAICX2brpYdfeDT0LPU35E2_VqRAzI1lAAKvDwACik5gVwMjL97HkqzBNgQ",
+        "file_unique_id": "AgADrw8AAopOYFc",
+        "file_size": 9431
+      }
+    }
+  };
+  await updateHandler(obj);
+  return new Response(JSON.stringify({ ok: true ,input: obj}), { status: 200 });
+})
 router.any('/api/*', apiHandler);
 
 // Adding Event Listener to handle incoming requests

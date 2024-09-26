@@ -1,3 +1,5 @@
+// noinspection JSValidateTypes
+
 /*
  *          M""""""""`M            dP
  *          Mmmmmm   .M            88
@@ -13,11 +15,25 @@
  *          *    -  -  All Rights Reserved  -  -    *
  *          * * * * * * * * * * * * * * * * * * * * *
  */
-// Cloudflare Worker-compatible version
 
-export function parseOpenVPNConfig(configContent) {
-    const lines = configContent.split('\n');
-    let config = {
+
+import {checkTCPConnection} from "./utils";
+
+/**
+ * @typedef {Object} ConnectionOptions
+ * @property {string} protocol
+ * @property {string|false} authUserPass
+ * @property {null|Object} remoteInfo
+ * @property {string} remoteInfo.host
+ * @property {number} remoteInfo.port
+ * @property {null|string} cert
+ * @property {null|string} key
+ * @property {null|string} ca
+ * @param config
+ * @returns {ConnectionOptions}
+ */
+export function ConnectionOptions(config) {
+    let defaultConfig = {
         remoteInfo: null,
         protocol: 'tcp',
         authUserPass: false,
@@ -26,17 +42,30 @@ export function parseOpenVPNConfig(configContent) {
         ca: null
     };
 
+    return Object.assign(defaultConfig, config);
+}
+
+/**
+ * Parse OpenVPN config file & return connection details
+ * @param {string} configContent
+ * @returns ConnectionOptions
+ */
+export function parseOpenVPNConfig(configContent) {
+    const lines = configContent.split('\n');
+    let config = {};
+
     let inCertSection = false, inKeySection = false, inCaSection = false;
     let certContent = '', keyContent = '', caContent = '';
 
     for (const line of lines) {
         if (line.startsWith('remote ')) {
             const [, host, port] = line.split(' ');
-            config.remoteInfo = { host, port: parseInt(port, 10) };
+            config.remoteInfo = {host, port: parseInt(port, 10)};
         } else if (line.startsWith('proto ')) {
             config.protocol = line.split(' ')[1].replace(/([^a-zA-Z]*)/g, '').toLowerCase();
         } else if (line.trim() === 'auth-user-pass') {
             config.authUserPass = true;
+            // TODO : parse auth-user-pass
         } else if (line.trim() === '<cert>') {
             inCertSection = true;
         } else if (line.trim() === '</cert>') {
@@ -61,53 +90,66 @@ export function parseOpenVPNConfig(configContent) {
         }
     }
 
-    return config;
+    return new ConnectionOptions(config);
 }
 
-export async function checkHTTPConnection(host, port, protocol = 'http', timeout = 5000) {
-    const url = `${protocol}://${host}:${port}`;
-    try {
-        const response = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, timeout });
-        if (response.ok) {
-            return true;
-        } else {
-            return false;
-        }
-    } catch (error) {
-        return false;
+
+
+// Note: UDP checking is not directly supported in Cloudflare Workers
+// You would need to implement a Durable Object for UDP communication
+// This is a placeholder function
+async function checkUDPConnection(host, port, timeout = 5000) {
+    console.warn('UDP connection checking is not implemented in this Cloudflare Worker');
+    return false;
+}
+
+/**
+ *
+ * @param {ConnectionOptions} config
+ * @returns {Promise<boolean>}
+ */
+export async function connectUsingConfig(config) {
+    if (!config.remoteInfo) {
+        throw new Error('Invalid connection details. Host and port must be present.');
     }
-}
 
-export async function checkOvpnConnection(config) {
     let isConnected;
-    console.log(`Attempting to connect to ${config.remoteInfo.host}:${config.remoteInfo.port} using ${config.protocol.toUpperCase()}`);
+    if (config.protocol === 'tcp') {
+        isConnected = await checkTCPConnection(config.remoteInfo.host, config.remoteInfo.port);
+    } else if (config.protocol === 'udp') {
+        isConnected = await checkUDPConnection(config.remoteInfo.host, config.remoteInfo.port);
+    } else {
+        throw new Error('Unsupported protocol');
+    }
 
-    // Replace the TCP and UDP checks with HTTP check
-    isConnected = await checkHTTPConnection(config.remoteInfo.host, config.remoteInfo.port, config.protocol);
+    let responseBody = `Attempted to connect to ${config.remoteInfo.host}:${config.remoteInfo.port} using ${config.protocol.toUpperCase()}\n`;
 
     if (isConnected) {
-        console.log('Successfully connected to OpenVPN server');
-        console.log('Additional connection requirements:');
-        console.log(`- Authentication required: ${config.authUserPass ? 'Yes' : 'No'}`);
-        console.log(`- Client certificate required: ${config.cert ? 'Yes' : 'No'}`);
-        console.log(`- Client key required: ${config.key ? 'Yes' : 'No'}`);
-        console.log(`- CA certificate required: ${config.ca ? 'Yes' : 'No'}`);
-        return true;
+        responseBody += 'Successfully connected to OpenVPN server\n';
+        responseBody += 'Additional connection requirements:\n';
+        responseBody += `- Authentication required: ${config.authUserPass ? 'Yes' : 'No'}\n`;
+        responseBody += `- Client certificate required: ${config.cert ? 'Yes' : 'No'}\n`;
+        responseBody += `- Client key required: ${config.key ? 'Yes' : 'No'}\n`;
+        responseBody += `- CA certificate required: ${config.ca ? 'Yes' : 'No'}\n`;
     } else {
-        console.log('Failed to connect to OpenVPN server');
-        return false;
+        responseBody += 'Failed to connect to OpenVPN server\n';
     }
+    console.log(responseBody);
+    return isConnected;
 }
 
 async function checkOpenVPNServerConnection(configContent) {
     const config = parseOpenVPNConfig(configContent);
-
-    if (!config.remoteInfo) {
-        console.error('Failed to parse OpenVPN config file');
-        throw new Error('Failed to parse OpenVPN config file');
-    }
-
-    return await checkOvpnConnection(config);
+    return await connectUsingConfig(config);
 }
+
+function main() {
+    const fs = require('fs');
+    // Usage
+    const configContent = fs.readFileSync('./config.ovpn', 'utf8');
+    checkOpenVPNServerConnection(configContent);
+}
+
+export default checkOpenVPNServerConnection;
 
 

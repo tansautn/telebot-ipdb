@@ -1,6 +1,7 @@
 // messageHandlers.js
 import {deleteByAccCount, deleteByIP, EXCLUDED_ACCS, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseInput, storeIP, updateIncrementValues} from './utils';
 import {bot} from './flaregram/bot';
+import {getConfig} from "./configProvider";
 
 export async function startCommand(body) {
   const user_id = body.message.from.id;
@@ -35,6 +36,9 @@ export async function handleIPMessage(body) {
   const chatId = body.message.chat.id;
   const input = parseInput(body.message.text.trim())[0];
   console.log('input', input);
+  if (body.message?.reply_to_message && body.message?.reply_to_message?.text){
+    return handleCustomAccInput(body.message);
+  }
   if (!input || !isValidIPv4(input.ip)) {
     const messageParams = {
       chat_id: chatId,
@@ -107,7 +111,7 @@ export async function handleCallbackQuery(callbackQuery) {
     const messageParams = {
       id: id,
       chat_id: chatId,
-      text: `Please enter a custom acc for IP ${ip}:`,
+      text: `${getConfig('labels.askForCustomAcc')} ${ip}:`,
       reply_markup: JSON.stringify({
         force_reply: true,
         input_field_placeholder: 'Enter custom acc'
@@ -125,7 +129,7 @@ export async function handleCustomAccInput(message) {
   const customAcc = message.text;
   const replyToMessage = message.reply_to_message;
 
-  if (replyToMessage && replyToMessage.text.startsWith('Please enter a custom acc for IP')) {
+  if (replyToMessage && replyToMessage.text.startsWith(getConfig('labels.askForCustomAcc'))) {
     const ip = replyToMessage.text.split(' ')[7].slice(0, -1); // Extract IP from the message
     const meta = await storeIP({ ip, acc: customAcc });
     const messageParams = {
