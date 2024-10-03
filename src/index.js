@@ -86,7 +86,10 @@ async function handleOVPNFile(obj) {
 export async function updateHandler(obj) {
   console.log('incoming update', obj);
   if (obj.message) {
-    if (obj.message.reply_to_message && obj.message.reply_to_message.text.startsWith(getConfig('labels.askForCustomAcc'))) {
+    if (obj.message?.document?.file_name.endsWith('.ovpn')) {
+      await handleOVPNFile(obj);
+    }
+    if (obj.message?.reply_to_message && obj?.message?.reply_to_message?.text?.startsWith(getConfig('labels.askForCustomAcc'))) {
       await handleCustomLabelInput(obj.message);
     } else {
       switch (true) {
