@@ -1,17 +1,87 @@
-import { router } from './flaregram/utils/router';
-import { bulkStoreCommand, handleCallbackQuery, handleCustomLabelInput, handleDeleteCommand, handleInlineQuery, handleIPMessage, startCommand } from './messageHandlers';
+/*
+ *          M""""""""`M            dP
+ *          Mmmmmm   .M            88
+ *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *          MMP  .MMMMM  88    88  88888"    88'  `88
+ *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *          M         M  `88888P'  dP   `YP  `88888P'
+ *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
+ *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *          * -  Copyright © 2024 (Z) Programing  - *
+ *          *    -  -  All Rights Reserved  -  -    *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ */
+
+import {router} from './flaregram/utils/router';
+import {
+  bulkStoreCommand,
+  handleCallbackQuery,
+  handleCustomLabelInput,
+  handleDeleteCommand,
+  handleInlineQuery,
+  handleIPMessage,
+  startCommand
+} from './messageHandlers';
 import {
   deleteByIP,
   deleteByLabelCount,
   getLabelsWithLastIncrements,
   isValidIPv4,
-  isValidUser
+  isValidUser,
+  parseOpenVPNConfig
 } from './utils';
 import {getConfig} from "./configProvider";
 
-
 // Function to handle OVPN file
+async function handleOVPNFile(obj) {
+  const document = obj.message.document;
 
+  if (document.file_name.endsWith('.ovpn')) {
+    try {
+      const fileContent = await bot.getFileContentById(document.file_id);
+
+      // Send file content to external API
+      const formData = new FormData();
+      formData.append('file', new Blob([fileContent]), 'config.ovpn');
+
+      const response = await fetch(`${API_BASE_URL}/tools/ovpn`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.ok) {
+        const {availability, latency, speed} = result;
+        const config = parseOpenVPNConfig(fileContent);
+        const {host: remoteHost, port: remotePort} = config.remoteInfo;
+
+        obj.message.note = `Connected to ${remoteHost}:${remotePort} via ${config.protocol}. Availability: ${availability}, Latency: ${latency}, Speed: ${speed}`;
+        obj.message.text = `${remoteHost}`;
+        // Handle as IP message
+        await handleIPMessage(obj);
+      } else {
+        // If not available or error occurred, send an error message
+        await bot.sendMessage({
+          chat_id: getChatIdFromUpdateObj(obj),
+          text: `Error: ${result.error}\nOVPN file content:\n\n${fileContent}`,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      await bot.sendMessage({
+        chat_id: getChatIdFromUpdateObj(obj),
+        text: 'handleOVPNFile: Error occurred \n' + e.message,
+      });
+    }
+  }
+}
 // Main update handler for Telegram webhook
 export async function updateHandler(obj) {
   console.log('incoming update', obj);

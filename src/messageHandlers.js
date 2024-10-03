@@ -1,5 +1,32 @@
+/*
+ *          M""""""""`M            dP
+ *          Mmmmmm   .M            88
+ *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *          MMP  .MMMMM  88    88  88888"    88'  `88
+ *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *          M         M  `88888P'  dP   `YP  `88888P'
+ *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
+ *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *          * -  Copyright © 2024 (Z) Programing  - *
+ *          *    -  -  All Rights Reserved  -  -    *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ */
+
 // messageHandlers.js
-import {deleteByAccCount, deleteByIP, EXCLUDED_ACCS, getIPData, getUniqueAccs, ipExists, isValidIPv4, parseInput, storeIP, updateIncrementValues} from './utils';
+import {
+  deleteByAccCount,
+  deleteByIP,
+  EXCLUDED_ACCS,
+  getIPData,
+  getUniqueAccs,
+  ipExists,
+  isValidIPv4,
+  parseInput,
+  storeIP,
+  updateIncrementValues
+} from './utils';
 import {bot} from './flaregram/bot';
 import {getConfig} from "./configProvider";
 
@@ -109,7 +136,6 @@ export async function handleCallbackQuery(callbackQuery) {
 //    await bot.message.answerCallbackQuery(messageParams);
   } else if (action === 'custom') {
     const messageParams = {
-      id: id,
       chat_id: chatId,
       text: `${getConfig('labels.askForCustomAcc')} ${ip}:`,
       reply_markup: JSON.stringify({
@@ -119,9 +145,6 @@ export async function handleCallbackQuery(callbackQuery) {
     };
     await bot.message.sendMessage(messageParams);
   }
-
-  // Answer the callback query to remove the "loading" state of the button
-//  await bot.message.answerCallbackQuery({callback_query_id: id});
 }
 
 export async function handleCustomAccInput(message) {
@@ -130,11 +153,25 @@ export async function handleCustomAccInput(message) {
   const replyToMessage = message.reply_to_message;
 
   if (replyToMessage && replyToMessage.text.startsWith(getConfig('labels.askForCustomAcc'))) {
-    const ip = replyToMessage.text.split(' ')[7].slice(0, -1); // Extract IP from the message
-    const meta = await storeIP({ ip, acc: customAcc });
+    const ip = replyToMessage.text.split(' ').pop().slice(0, -1); // Extract IP from the message
+    if (isValidIPv4(ip)) {
+      const meta = await storeIP({ip, acc: customAcc});
+      const messageParams = {
+        chat_id: chatId,
+        text: `Stored: ${ip} with acc: ${customAcc}${meta.lastIncrementValue}`
+      };
+      await bot.message.sendMessage(messageParams);
+    } else {
+      const messageParams = {
+        chat_id: chatId,
+        text: 'Invalid IPv4 address. Please try again with a valid IP.'
+      };
+      await bot.message.sendMessage(messageParams);
+    }
+  } else {
     const messageParams = {
       chat_id: chatId,
-      text: `Stored: ${ip} with acc: ${customAcc}${meta.lastIncrementValue}`
+      text: 'Invalid input. Please use the custom acc option from the menu.'
     };
     await bot.message.sendMessage(messageParams);
   }

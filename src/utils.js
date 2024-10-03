@@ -1,6 +1,22 @@
+/*
+ *          M""""""""`M            dP
+ *          Mmmmmm   .M            88
+ *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *          MMP  .MMMMM  88    88  88888"    88'  `88
+ *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *          M         M  `88888P'  dP   `YP  `88888P'
+ *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
+ *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *          * -  Copyright © 2024 (Z) Programing  - *
+ *          *    -  -  All Rights Reserved  -  -    *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ */
+
 // utils.js
 
-import {getSheetData, appendRow, updateRow, deleteRow} from './googleSheetsUtils';
+import {appendRow, deleteRow, getSheetData, updateRow} from './googleSheetsUtils';
 
 export const googleSrvAccount = JSON.parse(GOOGLE_SERV_ACC_JSON);
 export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note,dup'.split(',');
@@ -164,15 +180,33 @@ export function parseInput(text) {
         }
         const values = line.split(delim || ' ');
         const entry = {};
-        headers.forEach((header, index) => {
-            if (values[index]) {
-                if (header === 'acc') {
-                    entry[header.trim()] = values[index].trim().toLowerCase();
-                    return;
+
+        // Check if the first value is a valid IP address
+        if (isValidIPv4(values[0])) {
+            // Existing format: <ip> [<acc>] [<more_prop>]
+            headers.forEach((header, index) => {
+                if (values[index]) {
+                    if (header === 'acc') {
+                        entry[header.trim()] = values[index].trim().toLowerCase();
+                        return;
+                    }
+                    entry[header.trim()] = values[index].trim();
                 }
-                entry[header.trim()] = values[index].trim();
-            }
-        });
+            });
+        } else if (values.length >= 2 && isValidIPv4(values[1])) {
+            // New format: <acc> <ip> [<more_prop>]
+            entry['acc'] = values[0].trim().toLowerCase();
+            entry['ip'] = values[1].trim();
+            headers.slice(2).forEach((header, index) => {
+                if (values[index + 2]) {
+                    entry[header.trim()] = values[index + 2].trim();
+                }
+            });
+        } else {
+            // Invalid format
+            return null;
+        }
+
         return entry;
     }).filter(Boolean);
 }
@@ -280,4 +314,78 @@ export function isValidUser(user_id) {
     const merge = [...authorizedChats, ...sudoUsers, ...adminAuthApiKeys];
 
     return merge.includes(String(user_id));
+}
+
+/**
+ * @typedef {Object} ConnectionOptions
+ * @property {string} protocol
+ * @property {string|false} authUserPass
+ * @property {null|Object} remoteInfo
+ * @property {string} remoteInfo.host
+ * @property {number} remoteInfo.port
+ * @property {null|string} cert
+ * @property {null|string} key
+ * @property {null|string} ca
+ * @param config
+ * @returns {ConnectionOptions}
+ */
+export function ConnectionOptions(config) {
+    let defaultConfig = {
+        remoteInfo: null,
+        protocol: 'tcp',
+        authUserPass: false,
+        cert: null,
+        key: null,
+        ca: null
+    };
+
+    return Object.assign(defaultConfig, config);
+}
+
+/**
+ * Parse OpenVPN config file & return connection details
+ * @param {string} configContent
+ * @returns ConnectionOptions
+ */
+export function parseOpenVPNConfig(configContent) {
+    const lines = configContent.split('\n');
+    let config = {};
+
+    let inCertSection = false, inKeySection = false, inCaSection = false;
+    let certContent = '', keyContent = '', caContent = '';
+
+    for (const line of lines) {
+        if (line.startsWith('remote ')) {
+            const [, host, port] = line.split(' ');
+            config.remoteInfo = {host, port: parseInt(port, 10)};
+        } else if (line.startsWith('proto ')) {
+            config.protocol = line.split(' ')[1].replace(/([^a-zA-Z]*)/g, '').toLowerCase();
+        } else if (line.trim() === 'auth-user-pass') {
+            config.authUserPass = true;
+            // TODO : parse auth-user-pass
+        } else if (line.trim() === '<cert>') {
+            inCertSection = true;
+        } else if (line.trim() === '</cert>') {
+            inCertSection = false;
+            config.cert = certContent.trim();
+        } else if (line.trim() === '<key>') {
+            inKeySection = true;
+        } else if (line.trim() === '</key>') {
+            inKeySection = false;
+            config.key = keyContent.trim();
+        } else if (line.trim() === '<ca>') {
+            inCaSection = true;
+        } else if (line.trim() === '</ca>') {
+            inCaSection = false;
+            config.ca = caContent.trim();
+        } else if (inCertSection) {
+            certContent += line + '\n';
+        } else if (inKeySection) {
+            keyContent += line + '\n';
+        } else if (inCaSection) {
+            caContent += line + '\n';
+        }
+    }
+
+    return new ConnectionOptions(config);
 }
