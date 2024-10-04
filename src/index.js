@@ -22,17 +22,21 @@ import {
   handleDeleteCommand,
   handleInlineQuery,
   handleIPMessage,
-  startCommand
+  startCommand,
+  handleJsonCommand,
+  handleAuthCheckCommand
 } from './messageHandlers';
 import {
   deleteByIP,
   deleteByLabelCount,
+  getChatIdFromUpdateObj,
   getLabelsWithLastIncrements,
   isValidIPv4,
   isValidUser,
   parseOpenVPNConfig
 } from './utils';
 import {getConfig} from "./configProvider";
+import {bot} from "./flaregram/bot";
 
 // Function to handle OVPN file
 async function handleOVPNFile(obj) {
@@ -41,22 +45,18 @@ async function handleOVPNFile(obj) {
   if (document.file_name.endsWith('.ovpn')) {
     try {
       const fileContent = await bot.getFileContentById(document.file_id);
-
-      // Send file content to external API
-      const formData = new FormData();
-      formData.append('file', new Blob([fileContent]), 'config.ovpn');
-
       const response = await fetch(`${API_BASE_URL}/tools/ovpn`, {
         method: 'POST',
-        body: formData
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({fileContent: fileContent}),
       });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
       const result = await response.json();
-
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}. Message: ${result?.message}`);
+      }
       if (result.ok) {
         const {availability, latency, speed} = result;
         const config = parseOpenVPNConfig(fileContent);
@@ -64,6 +64,9 @@ async function handleOVPNFile(obj) {
 
         obj.message.note = `Connected to ${remoteHost}:${remotePort} via ${config.protocol}. Availability: ${availability}, Latency: ${latency}, Speed: ${speed}`;
         obj.message.text = `${remoteHost}`;
+        if (obj.message?.caption) {
+          obj.message.text += ` ${obj.message.caption}`;
+        }
         // Handle as IP message
         await handleIPMessage(obj);
       } else {
@@ -87,11 +90,11 @@ export async function updateHandler(obj) {
   console.log('incoming update', obj);
   if (obj.message) {
     if (obj.message?.document?.file_name.endsWith('.ovpn')) {
-      await handleOVPNFile(obj);
+      return await handleOVPNFile(obj);
     }
     if (obj.message?.reply_to_message && obj?.message?.reply_to_message?.text?.startsWith(getConfig('labels.askForCustomAcc'))) {
       await handleCustomLabelInput(obj.message);
-    } else {
+    } else if (obj.message?.text) {
       switch (true) {
         case obj.message.text.startsWith('/delete'):
         case obj.message.text.startsWith('/del'):
@@ -107,6 +110,12 @@ export async function updateHandler(obj) {
         case obj.message.text.includes('/bulkStore'):
         case obj.message.text.includes('/bulk-store'):
           await bulkStoreCommand(obj);
+          break;
+        case obj.message.text.startsWith('/json'):
+          await handleJsonCommand(obj);
+          break;
+        case obj.message.text.startsWith('/auth_check'):
+          await handleAuthCheckCommand(obj);
           break;
         default:
           await handleIPMessage(obj);
@@ -214,33 +223,35 @@ router.any('/dev', async function (request) {
       return new Response('Unauthorized', { status: 401 });
   }
   const obj = {
-    "update_id": 535670323,
+    "update_id": 535670557,
     "message": {
-      "message_id": 607,
+      "message_id": 991,
       "from": {
         "id": 1276300124,
         "is_bot": false,
         "first_name": "Ƶ𝔲𝔨𝔬",
         "last_name": "🔥",
         "username": "zukotnn",
-        "language_code": "vi"
+        "language_code": "en"
       },
       "chat": {
         "id": -1002213557605,
         "title": "IPDB",
         "type": "supergroup"
       },
-      "date": 1726719367,
+      "date": 1728017637,
       "document": {
-        "file_name": "VN_vpn213108604.ovpn",
+        "file_name": "VN_vpn438373355.ovpn",
         "mime_type": "application/octet-stream",
-        "file_id": "BQACAgUAAyEFAASD8DVlAAICX2brpYdfeDT0LPU35E2_VqRAzI1lAAKvDwACik5gVwMjL97HkqzBNgQ",
-        "file_unique_id": "AgADrw8AAopOYFc",
-        "file_size": 9431
-      }
+        "file_id": "BQACAgUAAyEFAASD8DVlAAID32b_dOVw5B3dlQhqMNIH5Gd-C4ESAAKGDwAC5OMBVCNV_yCyt1bvNgQ",
+        "file_unique_id": "AgADhg8AAuTjAVQ",
+        "file_size": 9433
+      },
+      "caption": "tfo"
     }
   };
-  await updateHandler(obj);
+  let rs = await handleOVPNFile(obj);
+  return rs;
   return new Response(JSON.stringify({ ok: true ,input: obj}), { status: 200 });
 })
 router.any('/api/*', apiHandler);

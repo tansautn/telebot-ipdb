@@ -21,7 +21,7 @@ import {appendRow, deleteRow, getSheetData, updateRow} from './googleSheetsUtils
 export const googleSrvAccount = JSON.parse(GOOGLE_SERV_ACC_JSON);
 export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note,dup'.split(',');
 export const HEADER_ROW = 1;
-export const EXCLUDED_ACCS = 'cex,cln,hoa,mua,tc,te,tha,txe,vankiepsau,vly'.split(',');
+export const EXCLUDED_ACCS = 'cex,cln,hoa,mua,tc,te,tha,txe,vankiepsau,vly,nam'.split(',');
 globalThis.accs = new Set();
 globalThis.lastIncrements = {};
 

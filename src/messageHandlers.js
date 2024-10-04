@@ -25,7 +25,8 @@ import {
   isValidIPv4,
   parseInput,
   storeIP,
-  updateIncrementValues
+  updateIncrementValues,
+  isValidUser
 } from './utils';
 import {bot} from './flaregram/bot';
 import {getConfig} from "./configProvider";
@@ -43,6 +44,10 @@ export async function startCommand(body) {
 
   const rs = await bot.message.sendMessage(messageParams);
   console.log('response in start command', rs);
+}
+
+export async function isAuthorizedCommand(body) {
+
 }
 export async function handleIpExist(input, allowAdd){
   allowAdd = allowAdd || false;
@@ -282,4 +287,70 @@ export async function bulkStoreCommand(body) {
     await bot.message.sendMessage(messageParams);
   }
   console.error('end of handler bulkStoreCommand');
+}
+
+export async function handleJsonCommand(body) {
+  const chatId = body.message.chat.id;
+  const messageId = body.message.message_id;
+  const replyToMessage = body.message.reply_to_message;
+
+  let jsonContent;
+  if (replyToMessage) {
+    jsonContent = JSON.stringify(replyToMessage, null, 2);
+  } else {
+    jsonContent = JSON.stringify(body, null, 2);
+  }
+
+  const messageParams = {
+    chat_id: chatId,
+    text: `\`\`\`json\n${jsonContent}\n\`\`\``,
+    parse_mode: 'Markdown',
+    reply_to_message_id: replyToMessage ? replyToMessage.message_id : messageId
+  };
+
+  await bot.message.sendMessage(messageParams);
+}
+
+export async function handleAuthCheckCommand(body) {
+  const chatId = body.message.chat.id;
+  const messageId = body.message.message_id;
+  const args = body.message.text.split(' ');
+
+  if (args.length < 2) {
+    const messageParams = {
+      chat_id: chatId,
+      text: 'Please provide a username, user ID, chat ID, or channel ID to check.',
+      reply_to_message_id: messageId
+    };
+    await bot.message.sendMessage(messageParams);
+    return;
+  }
+
+  const target = args[1];
+  let checkId;
+
+  if (target.startsWith('@')) {
+    // It's a username, we can't directly check authorization for usernames
+    const messageParams = {
+      chat_id: chatId,
+      text: 'Authorization cannot be directly checked for usernames. Please use a user ID, chat ID, or channel ID.',
+      reply_to_message_id: messageId
+    };
+    await bot.message.sendMessage(messageParams);
+    return;
+  } else {
+    checkId = target;
+  }
+
+  const isAuthorized = isValidUser(checkId);
+
+  const messageParams = {
+    chat_id: chatId,
+    text: isAuthorized
+        ? `✅ The ID ${checkId} is authorized to use this bot.`
+        : `❌ The ID ${checkId} is not authorized to use this bot.`,
+    reply_to_message_id: messageId
+  };
+
+  await bot.message.sendMessage(messageParams);
 }
