@@ -56,11 +56,14 @@ export async function handleIpExist(input, allowAdd){
   if (allowAdd) {
     // Add new entry
     const result = await storeIP(input);
-    return {ok: true, message: `Updated: ${input.ip} with new acc: ${input.acc}${result.lastIncrementValue}. OLD: ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')}`};
+    return {
+      ok: true,
+      message: `Đã cập nhật: ${input.ip} với tài khoản mới: ${input.acc}${result.lastIncrementValue}. OLD: ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')}`
+    };
   }
   return{
     ok: true,
-    message: `!! ALREADY USED BY ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!`,
+    message: `!! ĐÃ ĐƯỢC SỬ DỤNG BỞI ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!`,
     existItems: existingData
   }
 }
@@ -74,7 +77,7 @@ export async function handleIPMessage(body) {
   if (!input || !isValidIPv4(input.ip)) {
     const messageParams = {
       chat_id: chatId,
-      text: 'Invalid IPv4 address. Please provide a valid IP.'
+      text: 'Địa chỉ IPv4 không hợp lệ. Vui lòng cung cấp IP hợp lệ.'
     };
     await bot.message.sendMessage(messageParams);
     return;
@@ -97,11 +100,11 @@ export async function handleIPMessage(body) {
       const keyboard = accs.map(acc => [{text: acc, callback_data: `acc:${input.ip}:${acc}`}]);
 
       // Add a row for custom acc input
-      keyboard.push([{text: "Enter custom acc", callback_data: `custom:${input.ip}`}]);
+      keyboard.push([{text: "Nhập acc tùy chỉnh", callback_data: `custom:${input.ip}`}]);
 
       const messageParams = {
         chat_id: chatId,
-        text: 'Please choose an acc for the new IP or enter a custom one:',
+        text: 'Vui lòng chọn acc cho IP mới hoặc nhập acc tùy chỉnh:',
         reply_markup: JSON.stringify({
           inline_keyboard: keyboard
         })
@@ -123,7 +126,6 @@ export async function handleCallbackQuery(callbackQuery) {
   const chatId = message.chat.id;
   const messageId = callbackQuery.message.message_id;
   const [action, ip, acc] = data.split(':');
-  await bot.message.answerCallbackQuery({callback_query_id: id});
 
   if (action === 'acc') {
     const meta = await storeIP({ ip, acc });
@@ -132,11 +134,11 @@ export async function handleCallbackQuery(callbackQuery) {
       chat_id: chatId,
       callback_query_id: id,
       message_id: messageId,
-      text: `Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
+      text: `Không trùng lặp, có thể sử dụng \`${ip}\`.
+      Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
     };
 //    await bot.editMessageReplyMarkup(messageParams);
-    const txtRes = await bot.message.deleteMessages({chat_id: chatId, message_id: messageId});
-    messageParams.text += `\n${JSON.stringify(await txtRes.json())}`;
+    await bot.message.deleteMessages({chat_id: chatId, message_id: messageId});
     await bot.message.sendMessage(messageParams);
 //    await bot.message.answerCallbackQuery(messageParams);
   } else if (action === 'custom') {
@@ -145,11 +147,13 @@ export async function handleCallbackQuery(callbackQuery) {
       text: `${getConfig('labels.askForCustomAcc')} ${ip}:`,
       reply_markup: JSON.stringify({
         force_reply: true,
-        input_field_placeholder: 'Enter custom acc'
+        input_field_placeholder: 'Nhập acc tùy chỉnh'
       })
     };
     await bot.message.sendMessage(messageParams);
   }
+  await bot.message.answerCallbackQuery({callback_query_id: id});
+
 }
 
 export async function handleCustomAccInput(message) {
@@ -163,20 +167,21 @@ export async function handleCustomAccInput(message) {
       const meta = await storeIP({ip, acc: customAcc});
       const messageParams = {
         chat_id: chatId,
-        text: `Stored: ${ip} with acc: ${customAcc}${meta.lastIncrementValue}`
+        text: `Không trùng lặp, có thể sử dụng ${ip}.
+        Stored: ${ip} with acc: ${customAcc}${meta.lastIncrementValue}`
       };
       await bot.message.sendMessage(messageParams);
     } else {
       const messageParams = {
         chat_id: chatId,
-        text: 'Invalid IPv4 address. Please try again with a valid IP.'
+        text: 'Địa chỉ IPv4 không hợp lệ. Vui lòng thử lại với IP hợp lệ.'
       };
       await bot.message.sendMessage(messageParams);
     }
   } else {
     const messageParams = {
       chat_id: chatId,
-      text: 'Invalid input. Please use the custom acc option from the menu.'
+      text: 'Đầu vào không hợp lệ. Vui lòng sử dụng tùy chọn acc tùy chỉnh từ menu.'
     };
     await bot.message.sendMessage(messageParams);
   }

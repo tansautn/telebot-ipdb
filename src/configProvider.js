@@ -16,7 +16,7 @@
 
 const configs = {
     'labels': {
-        'askForCustomAcc': 'Please enter a custom acc for IP',
+        'askForCustomAcc': 'Vui lòng nhập acc tùy chỉnh cho IP',
     }
 };
 

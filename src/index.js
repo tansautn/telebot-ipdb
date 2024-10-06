@@ -55,7 +55,8 @@ async function handleOVPNFile(obj) {
       });
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}. Message: ${result?.message}`);
+        throw new Error(`Server kiểm tra vpn chết bạn dùng cách khác (nhập ip và chọn acc)
+        API request failed with status ${response.status}. Message: ${result?.message}`);
       }
       if (result.ok) {
         const {availability, latency, speed} = result;
@@ -73,7 +74,7 @@ async function handleOVPNFile(obj) {
         // If not available or error occurred, send an error message
         await bot.sendMessage({
           chat_id: getChatIdFromUpdateObj(obj),
-          text: `Error: ${result.error}\nOVPN file content:\n\n${fileContent}`,
+          text: `Error: ${result.error}`,
         });
       }
     } catch (e) {
