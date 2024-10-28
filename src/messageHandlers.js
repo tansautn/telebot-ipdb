@@ -26,7 +26,7 @@ import {
   parseInput,
   storeIP,
   updateIncrementValues,
-  isValidUser
+  isValidUser, apiUpdateAccForIp
 } from './utils';
 import {bot} from './flaregram/bot';
 import {getConfig} from "./configProvider";
@@ -61,6 +61,20 @@ export async function handleIpExist(input, allowAdd){
       message: `Đã cập nhật: ${input.ip} với tài khoản mới: ${input.acc}${result.lastIncrementValue}. OLD: ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')}`
     };
   }
+  try {
+    const copy = existingData.filter(() => true).pop();
+    copy.label = `${copy.acc}${copy.increment_value}`
+    copy.dup = existingData.filter(() => true).map(d => `${d.acc}${d.increment_value}`).join(', ');
+    const apiRes = await apiUpdateAccForIp(input.ip, `${copy.acc}`, copy);
+    return {
+      ok: true,
+      message: `!! ĐÃ ĐƯỢC SỬ DỤNG BỞI ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!\nAPI: ${JSON.stringify(apiRes)}`,
+      existItems: existingData
+    }
+  } catch (e) {
+
+  }
+
   return{
     ok: true,
     message: `!! ĐÃ ĐƯỢC SỬ DỤNG BỞI ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!`,

@@ -45,13 +45,17 @@ async function handleOVPNFile(obj) {
   if (document.file_name.endsWith('.ovpn')) {
     try {
       const fileContent = await bot.getFileContentById(document.file_id);
+      const postData = {fileContent: fileContent};
+      if (obj.message?.caption) {
+        postData.label = ` ${obj.message.caption}`;
+      }
       const response = await fetch(`${API_BASE_URL}/tools/ovpn`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({fileContent: fileContent}),
+        body: JSON.stringify(postData),
       });
       const result = await response.json();
       if (!response.ok) {

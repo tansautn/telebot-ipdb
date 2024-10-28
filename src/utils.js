@@ -45,6 +45,40 @@ export async function ipExists(ip) {
     return sheetData.some(row => row[0] === ip);
 }
 
+export async function apiReq(url, data, method = 'POST') {
+    try {
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+            method: method,
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        }
+
+        return response;
+    } catch (error) {
+        console.error(`API request error for ${url}:`, error);
+        throw error; // Re-throw to be handled by the caller
+    }
+}
+
+export async function apiUpdateAccForIp(ip, acc, meta) {
+    try {
+        const res = await apiReq('/tools/ovpn/label', {ip: ip, label: acc, meta: meta});
+        const jsonData = await res.json();
+        console.log('API update response:', jsonData);
+        return jsonData;
+    } catch (error) {
+        console.error('Error in apiUpdateAccForIp:', error);
+        throw error; // Re-throw to be handled by the caller
+    }
+}
+
 export async function storeIP(entry) {
     const {ip, acc} = entry;
     const sheetData = await getSheetData();
@@ -67,7 +101,12 @@ export async function storeIP(entry) {
     }
 
     const metadata = await getMetaData();
-    return {lastIncrementValue: metadata.lastIncrements[acc] || 0};
+    const ret = {acc: acc, lastIncrementValue: metadata.lastIncrements[acc] || 0};
+    try {
+        await apiUpdateAccForIp(ip, acc, ret);
+    } catch (e) {
+    }
+    return ret;
 }
 
 export async function getIPData(ip) {
