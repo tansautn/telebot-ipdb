@@ -14,16 +14,6 @@
  *          * * * * * * * * * * * * * * * * * * * * *
  */
 
-/*
- *          M""""""""`M            dP
- *          Mmmmmm   .M            88
- *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *          MMP  .MMMMM  88    88  88888"    88'  `88
- *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *          M         M  `88888P'  dP   `YP  `88888P'
- *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
- */
-
 export async function f_deleteMessages({chat_id, message_id}) {
   const botToken = BOT_TOKEN;
   const deleteUrl = `https://api.telegram.org/bot${botToken}/deleteMessage`;  // Changed to deleteMessage

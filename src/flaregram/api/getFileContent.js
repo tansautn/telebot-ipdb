@@ -9,22 +9,11 @@
  *
  *          * * * * * * * * * * * * * * * * * * * * *
  *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2024 (Z) Programing  - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
  *          *    -  -  All Rights Reserved  -  -    *
  *          * * * * * * * * * * * * * * * * * * * * *
  */
 
-/**
- * --------------------------------------------------------------------------
- *
- * --------------------------------------------------------------------------
- *  @PROJECT    : utils.js
- *  @AUTHOR     : Zuko
- *  @LINK       : https://www.zuko.pro/
- *  @FILE       : getFileContent.js
-
- *  @CREATED    : 7:00 PM , 03/Sep/2024
- */
 /**
  *
  * @param message

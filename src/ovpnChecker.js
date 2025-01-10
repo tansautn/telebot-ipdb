@@ -1,5 +1,3 @@
-// noinspection JSValidateTypes
-
 /*
  *          M""""""""`M            dP
  *          Mmmmmm   .M            88
@@ -11,11 +9,12 @@
  *
  *          * * * * * * * * * * * * * * * * * * * * *
  *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2024 (Z) Programing  - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
  *          *    -  -  All Rights Reserved  -  -    *
  *          * * * * * * * * * * * * * * * * * * * * *
  */
 
+// noinspection JSValidateTypes
 
 import {checkTCPConnection} from "./utils";
 
