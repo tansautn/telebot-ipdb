@@ -9,7 +9,7 @@
  *
  *          * * * * * * * * * * * * * * * * * * * * *
  *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2024 (Z) Programing  - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
  *          *    -  -  All Rights Reserved  -  -    *
  *          * * * * * * * * * * * * * * * * * * * * *
  */
@@ -68,7 +68,7 @@ export async function handleIpExist(input, allowAdd){
     const apiRes = await apiUpdateAccForIp(input.ip, `${copy.acc}`, copy);
     return {
       ok: true,
-      message: `!! ĐÃ ĐƯỢC SỬ DỤNG BỞI ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!\nAPI: ${JSON.stringify(apiRes)}`,
+      message: `!! ĐÃ ĐƯỢC SỬ DỤNG BỞI ${existingData.map(d => `${d.acc}${d.increment_value}`).join(', ')} !!`,
       existItems: existingData
     }
   } catch (e) {
@@ -81,7 +81,8 @@ export async function handleIpExist(input, allowAdd){
     existItems: existingData
   }
 }
-export async function handleIPMessage(body) {
+
+export async function handleIPMessage(body, isOvpnFile = false) {
   const chatId = body.message.chat.id;
   const input = parseInput(body.message.text.trim())[0];
   console.log('input', input);
@@ -98,6 +99,9 @@ export async function handleIPMessage(body) {
   }
 
   if (await ipExists(input.ip)) {
+    if (isOvpnFile) {
+      //delete original message from sender
+    }
     const result = await handleIpExist(input);
     const messageParams = {
       chat_id: chatId,
