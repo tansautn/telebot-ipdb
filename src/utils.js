@@ -9,7 +9,7 @@
  *
  *          * * * * * * * * * * * * * * * * * * * * *
  *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2024 (Z) Programing  - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
  *          *    -  -  All Rights Reserved  -  -    *
  *          * * * * * * * * * * * * * * * * * * * * *
  */
@@ -142,13 +142,11 @@ export async function deleteByAccCount(acc, count) {
 
 
 export function getChatIdFromUpdateObj(updateObj, getFromId = false) {
-    console.log('updateObj', JSON.stringify(updateObj, null, 2));
     const keys = ['message.chat.id', 'message.from.id', 'callback_query.chat.id', 'callback_query.from.id', 'inline_query.chat.id', 'inline_query.from.id',
         'chat.id', 'from.id'];
 
     for (const k in keys) {
         let curKey = keys[k];
-        console.log('key', keys[k]);
         if (getFromId) {
             if (curKey.includes('.chat')){
                 curKey = curKey.replace('.chat', '.from');
@@ -159,21 +157,19 @@ export function getChatIdFromUpdateObj(updateObj, getFromId = false) {
         const parts = curKey.split('.');
         if (parts.length > 1) {
             if (!updateObj.hasOwnProperty(parts[0])) {
-                console.error('continue == ', parts[0]);
                 continue;
             }
             let obj = updateObj[parts[0]];
             if (obj) {
                 for (let i = 1; i < parts.length; i++) {
-                    console.log('part == ', parts[i]);
                     if (!obj.hasOwnProperty(parts[i])) {
-                        console.error('key not found == ', parts[i]);
                         break;
                     }
                     obj = obj[parts[i]];
                 }
                 if (obj){
-                    console.info('found chat id == ', obj);
+                    console.log('return chat id from key == ', keys[k]);
+                    console.log('found chat id == ', obj);
                     return obj;
                 }
             }

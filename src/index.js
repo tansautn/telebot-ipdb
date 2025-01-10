@@ -41,6 +41,8 @@ import {bot} from "./flaregram/bot";
 // Function to handle OVPN file
 async function handleOVPNFile(obj) {
   const document = obj.message.document;
+  const chatId = getChatIdFromUpdateObj(obj);
+  const messageId = obj.message.message_id;
 
   if (document.file_name.endsWith('.ovpn')) {
     try {
@@ -49,6 +51,7 @@ async function handleOVPNFile(obj) {
       if (obj.message?.caption) {
         postData.label = ` ${obj.message.caption}`;
       }
+
       const response = await fetch(`${API_BASE_URL}/tools/ovpn`, {
         method: 'POST',
         headers: {
@@ -58,15 +61,21 @@ async function handleOVPNFile(obj) {
         body: JSON.stringify(postData),
       });
       const result = await response.json();
+
       if (!response.ok) {
-        // throw new Error(`Server kiểm tra vpn chết bạn dùng cách khác (nhập ip và chọn acc)
-        // API request failed with status ${response.status}. Message: ${result?.message}`);
+        // Delete the original message first
+        await bot.message.deleteMessages({
+          chat_id: chatId,
+          message_id: messageId
+        });
+
         await bot.sendMessage({
-          chat_id: getChatIdFromUpdateObj(obj),
+          chat_id: chatId,
           text: 'handleOVPNFile: Check failed',
         });
         return;
       }
+
       if (result.ok) {
         const {availability, latency, speed} = result;
         const config = parseOpenVPNConfig(fileContent);
@@ -77,19 +86,34 @@ async function handleOVPNFile(obj) {
         if (obj.message?.caption) {
           obj.message.text += ` ${obj.message.caption}`;
         }
+
+        // Add message_id to obj for deletion in handleIPMessage
+        obj.ovpn_message_id = messageId;
+
         // Handle as IP message
         await handleIPMessage(obj, true);
       } else {
-        // If not available or error occurred, send an error message
+        // Delete the original message before sending error
+        await bot.message.deleteMessages({
+          chat_id: chatId,
+          message_id: messageId
+        });
+
         await bot.sendMessage({
-          chat_id: getChatIdFromUpdateObj(obj),
+          chat_id: chatId,
           text: `Error: ${result.error}`,
         });
       }
     } catch (e) {
+      // Delete the original message before sending error
+      await bot.message.deleteMessages({
+        chat_id: chatId,
+        message_id: messageId
+      });
+
       console.error(e);
       await bot.sendMessage({
-        chat_id: getChatIdFromUpdateObj(obj),
+        chat_id: chatId,
         text: 'handleOVPNFile: Error occurred \n' + e.message,
       });
     }
@@ -97,7 +121,6 @@ async function handleOVPNFile(obj) {
 }
 // Main update handler for Telegram webhook
 export async function updateHandler(obj) {
-  console.log('incoming update', obj);
   if (obj.message) {
     if (obj.message?.document?.file_name.endsWith('.ovpn')) {
       return await handleOVPNFile(obj);

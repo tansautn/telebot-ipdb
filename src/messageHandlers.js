@@ -82,14 +82,25 @@ export async function handleIpExist(input, allowAdd){
   }
 }
 
+
 export async function handleIPMessage(body, isOvpnFile = false) {
   const chatId = body.message.chat.id;
   const input = parseInput(body.message.text.trim())[0];
-  console.log('input', input);
+  console.log('on handleIPMessage', body);
+
   if (body.message?.reply_to_message && body.message?.reply_to_message?.text){
     return handleCustomAccInput(body.message);
   }
+
   if (!input || !isValidIPv4(input.ip)) {
+    if (isOvpnFile) {
+      // Delete original OVPN message if this was called from handleOVPNFile
+      await bot.message.deleteMessages({
+        chat_id: chatId,
+        message_id: body.ovpn_message_id
+      });
+    }
+
     const messageParams = {
       chat_id: chatId,
       text: 'Địa chỉ IPv4 không hợp lệ. Vui lòng cung cấp IP hợp lệ.'
@@ -100,8 +111,13 @@ export async function handleIPMessage(body, isOvpnFile = false) {
 
   if (await ipExists(input.ip)) {
     if (isOvpnFile) {
-      //delete original message from sender
+      // Delete original OVPN message
+      await bot.message.deleteMessages({
+        chat_id: chatId,
+        message_id: body.ovpn_message_id
+      });
     }
+
     const result = await handleIpExist(input);
     const messageParams = {
       chat_id: chatId,
