@@ -1,17 +1,21 @@
 /*
- *          M""""""""`M            dP
- *          Mmmmmm   .M            88
- *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *          MMP  .MMMMM  88    88  88888"    88'  `88
- *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *          M         M  `88888P'  dP   `YP  `88888P'
- *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
  *
- *          * * * * * * * * * * * * * * * * * * * * *
- *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2025 (Z) Programing  - *
- *          *    -  -  All Rights Reserved  -  -    *
- *          * * * * * * * * * * * * * * * * * * * * *
+ * 			   M""""""""`M            dP
+ *             Mmmmmm   .M            88
+ *             MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *             MMP  .MMMMM  88    88  88888"    88'  `88
+ *             M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *             M         M  `88888P'  dP   `YP  `88888P'
+ *             MMMMMMMMMMM    -*-  Created by Zuko  -*-
+ *
+ *
+ *             * * * * * * * * * * * * * * * * * * * * *
+ *             * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *             * -  Copyright © 2025 (Z) Programing  - *
+ *             *    -  -  All Rights Reserved  -  -    *
+ *             * * * * * * * * * * * * * * * * * * * * *
+ *
+ *
  */
 
 // utils.js
@@ -47,14 +51,17 @@ export async function ipExists(ip) {
 
 export async function apiReq(url, data, method = 'POST') {
     try {
-        const response = await fetch(`${API_BASE_URL}${url}`, {
+        const options = {
             method: method,
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
-        });
+        };
+        if (data && !['GET', 'HEAD'].includes(method)) {
+            options.body = JSON.stringify(data);
+        }
+        const response = await fetch(`${API_BASE_URL}${url}`, options);
 
         if (!response.ok) {
             throw new Error(`API request failed: ${response.status} ${response.statusText}`);
@@ -66,6 +73,8 @@ export async function apiReq(url, data, method = 'POST') {
         throw error; // Re-throw to be handled by the caller
     }
 }
+
+export const trimString = (str, length, surfix = '....') => str.length > length ? `${str.slice(0, length)}` : str;
 
 export async function apiUpdateAccForIp(ip, acc, meta) {
     try {

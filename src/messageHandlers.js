@@ -1,17 +1,21 @@
 /*
- *          M""""""""`M            dP
- *          Mmmmmm   .M            88
- *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *          MMP  .MMMMM  88    88  88888"    88'  `88
- *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *          M         M  `88888P'  dP   `YP  `88888P'
- *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
  *
- *          * * * * * * * * * * * * * * * * * * * * *
- *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2025 (Z) Programing  - *
- *          *    -  -  All Rights Reserved  -  -    *
- *          * * * * * * * * * * * * * * * * * * * * *
+ * 			   M""""""""`M            dP
+ *             Mmmmmm   .M            88
+ *             MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *             MMP  .MMMMM  88    88  88888"    88'  `88
+ *             M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *             M         M  `88888P'  dP   `YP  `88888P'
+ *             MMMMMMMMMMM    -*-  Created by Zuko  -*-
+ *
+ *
+ *             * * * * * * * * * * * * * * * * * * * * *
+ *             * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *             * -  Copyright © 2025 (Z) Programing  - *
+ *             *    -  -  All Rights Reserved  -  -    *
+ *             * * * * * * * * * * * * * * * * * * * * *
+ *
+ *
  */
 
 // messageHandlers.js
@@ -26,10 +30,20 @@ import {
   parseInput,
   storeIP,
   updateIncrementValues,
-  isValidUser, apiUpdateAccForIp
+  isValidUser, apiUpdateAccForIp, apiReq
 } from './utils';
 import {bot} from './flaregram/bot';
 import {getConfig} from "./configProvider";
+import {
+  findLastRowWithData,
+  findMatchingDepositRow,
+  findMostRecentDateRow,
+  formatDate,
+  THU_CHI_COLS,
+  SHEET_NAME_THU_CHI,
+  insertRow,
+  updateRow, getSheetData
+} from './googleSheetsUtils';
 
 export async function startCommand(body) {
   const user_id = body.message.from.id;
@@ -158,36 +172,111 @@ export async function handleIPMessage(body, isOvpnFile = false) {
 export async function handleCallbackQuery(callbackQuery) {
   const { id, data, message } = callbackQuery;
   const chatId = message.chat.id;
-  const messageId = callbackQuery.message.message_id;
-  const [action, ip, acc] = data.split(':');
+  const messageId = message.message_id;
+  const [action, ...params] = data.split(':');
 
   if (action === 'acc') {
-    const meta = await storeIP({ ip, acc });
+    const meta = await storeIP({ ip: params[0], acc: params[1] });
     const messageParams = {
       id: id,
       chat_id: chatId,
       callback_query_id: id,
       message_id: messageId,
-      text: `Không trùng lặp, có thể sử dụng \`${ip}\`.
-      Stored: ${ip} with acc: ${acc}${meta.lastIncrementValue}`
+      text: `Không trùng lặp, có thể sử dụng \`${params[0]}\`.
+      Stored: ${params[0]} with acc: ${params[1]}${meta.lastIncrementValue}`
     };
-//    await bot.editMessageReplyMarkup(messageParams);
     await bot.message.deleteMessages({chat_id: chatId, message_id: messageId});
     await bot.message.sendMessage(messageParams);
-//    await bot.message.answerCallbackQuery(messageParams);
   } else if (action === 'custom') {
     const messageParams = {
       chat_id: chatId,
-      text: `${getConfig('labels.askForCustomAcc')} ${ip}:`,
+      text: `${getConfig('labels.askForCustomAcc')} ${params[0]}:`,
       reply_markup: JSON.stringify({
         force_reply: true,
         input_field_placeholder: 'Nhập acc tùy chỉnh'
       })
     };
     await bot.message.sendMessage(messageParams);
-  }
-  await bot.message.answerCallbackQuery({callback_query_id: id});
+  } else if (action === 'vpn') {
+    const [vpnId] = params;
+    
+    try {
+      // Lấy nội dung file VPN
+      const response = await apiReq(`/data/vpn/${vpnId}?withContent=1`, null, 'GET');
+      const data = await response.json();
 
+      if (!data.ok || !data.data) {
+        throw new Error('Failed to get VPN config');
+      }
+      const label = data.data.label + `${data.data.metadata.increment_value || data.data.metadata.lastIncrementValue || ''}`;
+// Create FormData and append file
+      const formData = new FormData();
+      // Convert string to Uint8Array for Cloudflare Workers
+      const encoder = new TextEncoder();
+      const fileContent = encoder.encode(data.data.connect_config_content);
+
+      // Gửi file using Uint8Array
+      // await bot.message.sendDocument({
+      //   chat_id: chatId,
+      //   document: fileContent,
+      //   filename: `${label}.ovpn`,
+      //   caption: `VPN Config for ${label}`
+      // });
+      //
+      // Create file from Uint8Array
+      const file = new File([fileContent], `${label}.ovpn`, {
+        type: 'application/x-openvpn-profile'
+      });
+
+      // Append required parameters to FormData
+      formData.append('chat_id', chatId);
+      formData.append('document', file);
+      formData.append('caption', `VPN Config for ${label}`);
+
+      // Send using POST request
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+        method: 'POST',
+        body: formData
+      });
+      // Xóa message chọn VPN
+      await bot.message.deleteMessages({
+        chat_id: chatId,
+        message_id: messageId
+      });
+    } catch (error) {
+      console.error('Error sending VPN file:', error);
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: 'Có lỗi xảy ra khi tải file VPN. Vui lòng thử lại sau.'
+      });
+    }
+  } else if (data.startsWith('out:')) {
+    const [, acc, amountOut, rowIndex] = data.split(':');
+    
+    try {
+      const data = await getSheetData(SHEET_NAME_THU_CHI);
+      const row = data[parseInt(rowIndex) - HEADER_ROW - 1];
+      row[4] = amountOut; // Column E - Out
+      
+      await updateRow(parseInt(rowIndex), row, SHEET_NAME_THU_CHI);
+
+      await bot.message.editMessageText({
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        text: `✅ Đã cập nhật withdrawal:\nAcc: ${acc}\nAmount out: ${amountOut}`
+      });
+    } catch (error) {
+      console.error('Error updating withdrawal:', error);
+      await bot.message.editMessageText({
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        text: 'Có lỗi xảy ra khi cập nhật withdrawal'
+      });
+    }
+    return;
+  }
+
+  await bot.message.answerCallbackQuery({id: id});
 }
 
 export async function handleCustomAccInput(message) {
@@ -392,4 +481,358 @@ export async function handleAuthCheckCommand(body) {
   };
 
   await bot.message.sendMessage(messageParams);
+}
+
+export async function handleQueryCommand(body) {
+  const chatId = body.message.chat.id;
+  const args = body.message.text.split(' ');
+  
+  if (args.length < 2) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Vui lòng cung cấp label để tìm kiếm. Ví dụ: /query bl'
+    });
+    return;
+  }
+
+  const label = args[1];
+  
+  try {
+    // Gọi API để lấy danh sách VPN
+    const response = await apiReq(`/data/vpn?is_alive=1&sortBy=checked_at&sortDir=desc&withContent=1&label=${label}`, null, 'GET');
+    const data = await response.json();
+
+    if (!data.ok || !data.data || data.data.length === 0) {
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: `Không tìm thấy VPN nào cho label "${label}"`
+      });
+      return;
+    }
+
+    // Lấy 5 item đầu tiên
+    const items = data.data.slice(0, 5);
+    
+    // Tạo inline keyboard từ các items
+    const keyboard = items.map(item => {
+      let metadata = item.metadata
+      if(item.metadata && typeof item.metadata === 'string'){
+        metadata = JSON.parse(item.metadata || '{}');
+      }
+      console.log('metadata', metadata);
+      const incrementValue = metadata.increment_value || metadata.lastIncrementValue;
+      const buttonLabel = `${label}${incrementValue} | ${item.host} | ${item.checked_at}`;
+      
+      return [{
+        text: buttonLabel,
+        callback_data: `vpn:${item.id}`
+      }];
+    });
+
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Chọn VPN bạn muốn tải:',
+      reply_markup: JSON.stringify({
+        inline_keyboard: keyboard
+      })
+    });
+
+  } catch (error) {
+    console.error('Error in handleQueryCommand:', error);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi tìm kiếm VPN. ' + error
+    });
+  }
+}
+
+export async function handleDepositCommand(body) {
+  const chatId = body.message.chat.id;
+  const args = body.message.text.trim().split(/\s+/);
+  const command = args[0].toLowerCase();
+
+  if (args.length < 3) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Sử dụng: /dep <acc> <amount> [site]'
+    });
+    return;
+  }
+
+  const acc = args[1].toLowerCase();
+  const amount = parseFloat(args[2]);
+  const site = args.length > 3 ? args[3] : '';
+
+  if (isNaN(amount)) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Số tiền không hợp lệ'
+    });
+    return;
+  }
+
+  try {
+    // Get current date in UTC+7
+    const now = new Date();
+    now.setHours(now.getHours() + 7); // Convert to UTC+7
+    
+    // Find most recent date row
+    const data = await getSheetData(SHEET_NAME_THU_CHI);
+    let lastDateRow = null;
+    let lastDateValue = '';
+    
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (data[i][0] && data[i][0].match(/^\d{2}\/\d{2}(\/\d{4})?$/)) {
+        lastDateRow = i;
+        lastDateValue = data[i][0];
+        break;
+      }
+    }
+    
+    // Parse last date
+    const [lastDay, lastMonth, lastYear] = lastDateValue.split('/').map(n => parseInt(n));
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    
+    // Find last row with data in column C (ACC)
+    const lastDataRow = await findLastRowWithData(THU_CHI_COLS.ACC);
+    
+    // Check if we need to add a new date row
+    let needNewDateRow = false;
+    if (lastDateValue) {
+      // If current day is different from last date day
+      if (currentDay !== lastDay || currentMonth !== lastMonth) {
+        needNewDateRow = true;
+      }
+    } else {
+      needNewDateRow = true;
+    }
+    
+    if (needNewDateRow) {
+      // Format date string
+      let dateStr;
+      if (currentMonth !== lastMonth) {
+        dateStr = `${currentDay.toString().padStart(2, '0')}/${currentMonth.toString().padStart(2, '0')}/${currentYear}`;
+      } else {
+        dateStr = `${currentDay.toString().padStart(2, '0')}/${currentMonth.toString().padStart(2, '0')}`;
+      }
+      
+      // Insert empty date row with gray background
+      const dateRow = Array(26).fill('');
+      dateRow[0] = dateStr;
+      await insertRow(lastDataRow + 1, dateRow, SHEET_NAME_THU_CHI, true);
+      
+      // Now insert the deposit row
+      const newRow = Array(26).fill('');
+      newRow[1] = site; // Column B - Site
+      newRow[2] = acc; // Column C - Acc 
+      newRow[3] = amount.toString(); // Column D - Deposit
+      await insertRow(lastDataRow + 2, newRow);
+    } else {
+      // Just insert the deposit row
+      const newRow = Array(26).fill('');
+      newRow[1] = site;
+      newRow[2] = acc;
+      newRow[3] = amount.toString();
+      await insertRow(lastDataRow + 1, newRow);
+    }
+
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: `✅ Đã thêm deposit:\nAcc: ${acc}\nAmount: ${amount}\nSite: ${site || 'N/A'}`
+    });
+  } catch (error) {
+    console.error('Error in handleDepositCommand:', error);
+    const stackString = error.stack;
+
+    // Chuyển đổi thành mảng (tách theo dòng mới)
+    const stackArray = stackString.split('\n').map(line => line.trim());
+    console.log('STACK ARRAY', stackArray);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi thêm deposit'
+    });
+  }
+}
+
+export async function handleOutCommand(body) {
+  const chatId = body.message.chat.id;
+  const args = body.message.text.trim().split(/\s+/);
+
+  if (args.length < 3) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Sử dụng: /out <acc> <amount_out> [amount_in] [site]'
+    });
+    return;
+  }
+
+  const acc = args[1].toLowerCase();
+  const amountOut = parseFloat(args[2]);
+  let amountIn = args.length > 3 ? parseFloat(args[3]) : null;
+  let site = args.length > 4 ? args[4] : '';
+
+  // Check if the fourth argument is a site instead of amount_in
+  if (args.length === 4 && isNaN(args[3])) {
+    amountIn = null;
+    site = args[3];
+  }
+
+  if (isNaN(amountOut)) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Số tiền rút không hợp lệ'
+    });
+    return;
+  }
+
+  try {
+    let rowIndex;
+    
+    if (amountIn === 0) {
+      // Create new row for withdrawal
+      const lastDataRow = await findLastRowWithData(THU_CHI_COLS.ACC);
+      const mostRecentDateRow = await findMostRecentDateRow();
+      
+      const newRow = Array(26).fill('');
+      if (!mostRecentDateRow || mostRecentDateRow < lastDataRow) {
+        newRow[0] = formatDate();
+      }
+      newRow[1] = site;
+      newRow[2] = acc;
+      newRow[4] = amountOut.toString(); // Column E - Out
+      
+      await insertRow(lastDataRow + 1, newRow);
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: `✅ Đã thêm withdrawal mới:\nAcc: ${acc}\nAmount out: ${amountOut}\nSite: ${site || 'N/A'}`
+      });
+      return;
+    }
+
+    // Find matching deposit row
+    rowIndex = await findMatchingDepositRow(acc, site, amountIn);
+
+    if (!rowIndex && !amountIn) {
+      // If no amount_in provided, show recent deposits for confirmation
+      const data = await getSheetData(SHEET_NAME_THU_CHI);
+      const recentDeposits = [];
+      let currentDate = '';
+      
+      for (let i = data.length - 1; i >= 0 && recentDeposits.length < 5; i--) {
+        const row = data[i];
+        if (row[2] === acc && (!site || row[1] === site) && row[3]) {
+          if (row[0] && row[0].match(/^\d{2}\/\d{2}/)) {
+            currentDate = row[0];
+          }
+          recentDeposits.push({
+            date: currentDate,
+            site: row[1] || 'N/A',
+            amount: row[3],
+            rowIndex: i + HEADER_ROW + 1
+          });
+        }
+      }
+
+      if (recentDeposits.length === 0) {
+        await bot.message.sendMessage({
+          chat_id: chatId,
+          text: 'Không tìm thấy deposit phù hợp'
+        });
+        return;
+      }
+
+      // Create inline keyboard for selection
+      const keyboard = recentDeposits.map(dep => [{
+        text: `${dep.date} | ${dep.site} | ${dep.amount}`,
+        callback_data: `out:${acc}:${amountOut}:${dep.rowIndex}`
+      }]);
+
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: 'Chọn deposit để update:',
+        reply_markup: JSON.stringify({
+          inline_keyboard: keyboard
+        })
+      });
+      return;
+    }
+
+    if (!rowIndex) {
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: 'Không tìm thấy deposit phù hợp'
+      });
+      return;
+    }
+
+    // Update the out amount
+    const data = await getSheetData(SHEET_NAME_THU_CHI);
+    const row = data[rowIndex - HEADER_ROW - 1];
+    row[4] = amountOut.toString(); // Column E - Out
+    
+    await updateRow(rowIndex, row, SHEET_NAME_THU_CHI);
+
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: `✅ Đã cập nhật withdrawal:\nAcc: ${acc}\nAmount out: ${amountOut}`
+    });
+  } catch (error) {
+    console.error('Error in handleOutCommand:', error);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi cập nhật withdrawal'
+    });
+  }
+}
+
+export async function handleNoteCommand(body) {
+  const chatId = body.message.chat.id;
+  const text = body.message.text.trim();
+  const firstLine = text.split('\n')[0];
+  const args = firstLine.split(/\s+/);
+
+  if (args.length < 4) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Sử dụng: /note <acc> <site> <note>'
+    });
+    return;
+  }
+
+  const acc = args[1].toLowerCase();
+  const site = ['b9', 'vnd'].includes(args[2].toLowerCase()) ? '' : args[2];
+  const note = text.substring(text.indexOf(args[3]));
+
+  try {
+    // Find matching row
+    const rowIndex = await findMatchingDepositRow(acc, site);
+
+    if (!rowIndex) {
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: 'Không tìm thấy deposit phù hợp'
+      });
+      return;
+    }
+
+    // Update the note
+    const data = await getSheetData(SHEET_NAME_THU_CHI);
+    const row = data[rowIndex - HEADER_ROW - 1];
+    row[6] = note; // Column G - Note
+    
+    await updateRow(rowIndex, row, SHEET_NAME_THU_CHI);
+
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: `✅ Đã cập nhật note:\nAcc: ${acc}\nSite: ${site || 'N/A'}\nNote: ${note}`
+    });
+  } catch (error) {
+    console.error('Error in handleNoteCommand:', error);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi cập nhật note'
+    });
+  }
 }

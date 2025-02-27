@@ -1,17 +1,21 @@
 /*
- *          M""""""""`M            dP
- *          Mmmmmm   .M            88
- *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *          MMP  .MMMMM  88    88  88888"    88'  `88
- *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *          M         M  `88888P'  dP   `YP  `88888P'
- *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
  *
- *          * * * * * * * * * * * * * * * * * * * * *
- *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *          * -  Copyright © 2025 (Z) Programing  - *
- *          *    -  -  All Rights Reserved  -  -    *
- *          * * * * * * * * * * * * * * * * * * * * *
+ * 			   M""""""""`M            dP
+ *             Mmmmmm   .M            88
+ *             MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *             MMP  .MMMMM  88    88  88888"    88'  `88
+ *             M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *             M         M  `88888P'  dP   `YP  `88888P'
+ *             MMMMMMMMMMM    -*-  Created by Zuko  -*-
+ *
+ *
+ *             * * * * * * * * * * * * * * * * * * * * *
+ *             * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *             * -  Copyright © 2025 (Z) Programing  - *
+ *             *    -  -  All Rights Reserved  -  -    *
+ *             * * * * * * * * * * * * * * * * * * * * *
+ *
+ *
  */
 
 import {router} from './flaregram/utils/router';
@@ -24,7 +28,11 @@ import {
   handleIPMessage,
   startCommand,
   handleJsonCommand,
-  handleAuthCheckCommand
+  handleAuthCheckCommand,
+  handleQueryCommand,
+  handleDepositCommand,
+  handleOutCommand,
+  handleNoteCommand
 } from './messageHandlers';
 import {
   deleteByIP,
@@ -33,7 +41,7 @@ import {
   getLabelsWithLastIncrements,
   isValidIPv4,
   isValidUser,
-  parseOpenVPNConfig
+  parseOpenVPNConfig, trimString
 } from './utils';
 import {getConfig} from "./configProvider";
 import {bot} from "./flaregram/bot";
@@ -60,6 +68,7 @@ async function handleOVPNFile(obj) {
         },
         body: JSON.stringify(postData),
       });
+      const clone = response.clone();
       const result = await response.json();
 
       if (!response.ok) {
@@ -68,10 +77,20 @@ async function handleOVPNFile(obj) {
           chat_id: chatId,
           message_id: messageId
         });
-
+        let txt = 'handleOVPNFile: Failed to contacting server.\n';
+        txt += `Status: ${response.status}\n`;
+        try {
+          const data = trimString(await clone.text(), 560, ' __TRIMMED__');
+          txt += `Body: 
+\`\`\`
+${data}
+\`\`\``;
+        } catch (e) {
+          txt += 'BODY_ERR: ' + e.message;
+        }
         await bot.sendMessage({
           chat_id: chatId,
-          text: 'handleOVPNFile: Check failed',
+          text: txt,
         });
         return;
       }
@@ -128,27 +147,37 @@ export async function updateHandler(obj) {
     if (obj.message?.reply_to_message && obj?.message?.reply_to_message?.text?.startsWith(getConfig('labels.askForCustomAcc'))) {
       await handleCustomLabelInput(obj.message);
     } else if (obj.message?.text) {
+      const command = obj.message.text.split(/\s+/)[0].toLowerCase();
       switch (true) {
-        case obj.message.text.startsWith('/delete'):
-        case obj.message.text.startsWith('/del'):
+        case command === '/delete' || command === '/del':
           await handleDeleteCommand(obj);
           break;
-        case obj.message.text.includes('/hook'):
+        case command.includes('/hook'):
           await hookCommand(obj);
           break;
-        case obj.message.text.includes('/start'):
+        case command.includes('/start'):
           await startCommand(obj);
           break;
-        case obj.message.text.startsWith('/bulk'):
-        case obj.message.text.includes('/bulkStore'):
-        case obj.message.text.includes('/bulk-store'):
+        case command === '/bulk' || command === '/bulkstore' || command === '/bulk-store':
           await bulkStoreCommand(obj);
           break;
-        case obj.message.text.startsWith('/json'):
+        case command === '/json':
           await handleJsonCommand(obj);
           break;
-        case obj.message.text.startsWith('/auth_check'):
+        case command === '/auth_check':
           await handleAuthCheckCommand(obj);
+          break;
+        case command === '/query':
+          await handleQueryCommand(obj);
+          break;
+        case command === '/dep' || command === '/add':
+          await handleDepositCommand(obj);
+          break;
+        case command === '/out':
+          await handleOutCommand(obj);
+          break;
+        case command === '/note':
+          await handleNoteCommand(obj);
           break;
         default:
           await handleIPMessage(obj);
