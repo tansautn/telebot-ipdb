@@ -30,7 +30,7 @@ import {
   parseInput,
   storeIP,
   updateIncrementValues,
-  isValidUser, apiUpdateAccForIp, apiReq, HEADER_ROW
+  isValidUser, apiUpdateAccForIp, apiReq, HEADER_ROW, _addDateTimeToRow
 } from './utils';
 import {bot} from './flaregram/bot';
 import {getConfig} from "./configProvider";
@@ -624,17 +624,21 @@ export async function handleDepositCommand(body) {
       await insertRow(lastDataRow + 1, dateRow, SHEET_NAME_THU_CHI, true);
       
       // Now insert the deposit row
-      const newRow = Array(26).fill('');
+      let newRow = Array(26).fill('');
       newRow[1] = site; // Column B - Site
       newRow[2] = acc; // Column C - Acc 
       newRow[3] = amount.toString(); // Column D - Deposit
+      newRow[5] = `=SUM(E${lastDataRow + 2},-D${lastDataRow + 2})`; // Column F - Profit
+      newRow = _addDateTimeToRow(newRow)
       await insertRow(lastDataRow + 2, newRow);
     } else {
       // Just insert the deposit row
-      const newRow = Array(26).fill('');
+      let newRow = Array(26).fill('');
       newRow[1] = site;
       newRow[2] = acc;
       newRow[3] = amount.toString();
+      newRow[5] = `=SUM(E${lastDataRow + 1},-D${lastDataRow + 1})`; // Column F - Profit
+      newRow = _addDateTimeToRow(newRow)
       await insertRow(lastDataRow + 1, newRow);
     }
 
@@ -652,6 +656,57 @@ export async function handleDepositCommand(body) {
     await bot.message.sendMessage({
       chat_id: chatId,
       text: 'Có lỗi xảy ra khi thêm deposit'
+    });
+  }
+}
+
+export async function handleBetCommand(body) {
+  const chatId = body.message.chat.id;
+  const text = body.message.text.trim();
+  const firstLine = text.split('\n')[0];
+  const args = firstLine.split(/\s+/);
+
+  if (args.length < 4) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Sử dụng: /bet <acc> <site> <amount>'
+    });
+    return;
+  }
+
+  const acc = args[1].toLowerCase();
+  const site = ['b9', 'vnd'].includes(args[2].toLowerCase()) ? '' : args[2];
+  const amount = text.substring(text.indexOf(args[3]));
+
+  try {
+    // Find matching row
+    const rowIndex = await findMatchingDepositRow(acc, site);
+
+    if (!rowIndex) {
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: 'Không tìm thấy deposit phù hợp'
+      });
+      return;
+    }
+
+    // Update the bet amount
+    const data = await getSheetData(SHEET_NAME_THU_CHI);
+    const row = data[rowIndex - HEADER_ROW - 1];
+    row[8] = (new Date()); // Column I - Date_Converted
+    row[10] = amount; // Column K - Bet Amount
+    
+    await updateRow(rowIndex, row, SHEET_NAME_THU_CHI);
+
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: `✅ Đã cập nhật bet amount:\nAcc: ${acc}\nSite: ${site || 'N/A'}\nAmount: ${amount}`
+    });
+  } catch (error) {
+    console.error('Error in handleBetCommand:', error);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi cập nhật bet amount'
     });
   }
 }
@@ -695,14 +750,15 @@ export async function handleOutCommand(body) {
       const lastDataRow = await findLastRowWithData(THU_CHI_COLS.ACC);
       const mostRecentDateRow = await findMostRecentDateRow();
       
-      const newRow = Array(26).fill('');
+      let newRow = Array(26).fill('');
       if (!mostRecentDateRow || mostRecentDateRow < lastDataRow) {
         newRow[0] = formatDate();
       }
       newRow[1] = site;
       newRow[2] = acc;
       newRow[4] = amountOut.toString(); // Column E - Out
-      
+      newRow[5] = `=SUM(E${lastDataRow + 1},-D${lastDataRow + 1})`; // Column F - Profit
+      newRow = _addDateTimeToRow(newRow)
       await insertRow(lastDataRow + 1, newRow);
       await bot.message.sendMessage({
         chat_id: chatId,
@@ -767,10 +823,13 @@ export async function handleOutCommand(body) {
       return;
     }
 
-    // Update the out amount
+    // Update the out amount and profit
     const data = await getSheetData(SHEET_NAME_THU_CHI);
     const row = data[rowIndex - HEADER_ROW - 1];
     row[4] = amountOut.toString(); // Column E - Out
+    
+    // Add profit formula
+    row[5] = `=SUM(E${rowIndex},-D${rowIndex})`; // Column F - Profit
     
     await updateRow(rowIndex, row, SHEET_NAME_THU_CHI);
 

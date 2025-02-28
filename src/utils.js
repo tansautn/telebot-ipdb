@@ -29,6 +29,15 @@ export const EXCLUDED_ACCS = 'cex,cln,hoa,mua,tc,te,tha,txe,vankiepsau,vly,nam'.
 globalThis.accs = new Set();
 globalThis.lastIncrements = {};
 
+export function convertToTimeZone(date = new Date, timeZoneOffset = 7) {
+  return new Date(date.getTime() + timeZoneOffset * 60 * 60 * 1000);
+}
+
+export function _addDateTimeToRow(row){
+  const dateTime = convertToTimeZone().toISOString().replace('T', ' ').replace('Z', '');
+  row[8] = dateTime;
+  return row;
+}
 export async function getMetaData() {
     const sheetData = await getSheetData();
     sheetData.forEach(row => {

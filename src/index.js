@@ -32,7 +32,8 @@ import {
   handleQueryCommand,
   handleDepositCommand,
   handleOutCommand,
-  handleNoteCommand
+  handleNoteCommand,
+  handleBetCommand
 } from './messageHandlers';
 import {
   deleteByIP,
@@ -178,6 +179,9 @@ export async function updateHandler(obj) {
           break;
         case command === '/note':
           await handleNoteCommand(obj);
+          break;
+        case command === '/bet':
+          await handleBetCommand(obj);
           break;
         default:
           await handleIPMessage(obj);
