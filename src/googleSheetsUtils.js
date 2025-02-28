@@ -37,7 +37,7 @@ export const THU_CHI_COLS = {
   NOTE2: 'H'
 };
 
-const HEADER_ROW = 1;
+import {HEADER_ROW} from './utils';
 
 async function getAccessToken() {
   try {
