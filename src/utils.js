@@ -1,21 +1,17 @@
 /*
+ *          M""""""""`M            dP
+ *          Mmmmmm   .M            88
+ *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *          MMP  .MMMMM  88    88  88888"    88'  `88
+ *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *          M         M  `88888P'  dP   `YP  `88888P'
+ *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
  *
- * 			   M""""""""`M            dP
- *             Mmmmmm   .M            88
- *             MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *             MMP  .MMMMM  88    88  88888"    88'  `88
- *             M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *             M         M  `88888P'  dP   `YP  `88888P'
- *             MMMMMMMMMMM    -*-  Created by Zuko  -*-
- *
- *
- *             * * * * * * * * * * * * * * * * * * * * *
- *             * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *             * -  Copyright © 2025 (Z) Programing  - *
- *             *    -  -  All Rights Reserved  -  -    *
- *             * * * * * * * * * * * * * * * * * * * * *
- *
- *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
+ *          *    -  -  All Rights Reserved  -  -    *
+ *          * * * * * * * * * * * * * * * * * * * * *
  */
 
 // utils.js
@@ -25,7 +21,8 @@ import {appendRow, deleteRow, getSheetData, updateRow} from './googleSheetsUtils
 export const googleSrvAccount = JSON.parse(GOOGLE_SERV_ACC_JSON);
 export const HEADERS = 'ip,acc,increment_value,port,auth_user,auth_pwd,note,dup'.split(',');
 export const HEADER_ROW = 1;
-export const EXCLUDED_ACCS = 'cex,cln,hoa,mua,tc,te,tha,txe,vankiepsau,vly,nam'.split(',');
+export const EXCLUDED_ACCS = 'cex,ntt,tg,cln,hoa,mua,tc,te,tha,txe,vankiepsau,vly,nam'.split(',');
+export const ONLY_PROCESS_SITES = ['', 'N/A', 'i9', 'bv'];
 globalThis.accs = new Set();
 globalThis.lastIncrements = {};
 
@@ -38,11 +35,14 @@ export function _addDateTimeToRow(row){
   row[8] = dateTime;
   return row;
 }
-export async function getMetaData() {
-    const sheetData = await getSheetData();
+
+export async function getMetaData(data, isThuChi = false) {
+    const sheetData = data ? data : await getSheetData();
+    const accIdx = isThuChi ? 2 : 1;
+    const icrementIdx = isThuChi ? 0 : 2;
     sheetData.forEach(row => {
-        const acc = row[1]?.toLowerCase();
-        const incrementValue = parseInt(row[2]);
+        const acc = row[accIdx]?.toLowerCase();
+        const incrementValue = parseInt(row[icrementIdx]);
         acc && accs.add(acc);
         lastIncrements[acc] = Math.max(lastIncrements[acc] || 0, incrementValue);
     });
@@ -281,8 +281,8 @@ export function isValidIPv4(ip) {
     return ip.split('.').every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
 }
 
-export async function getUniqueAccs() {
-    const metadata = await getMetaData();
+export async function getUniqueAccs(data, isThuChi = false) {
+    const metadata = await getMetaData(data, isThuChi);
     if (metadata && metadata.accs) {
         return metadata.accs;
     }

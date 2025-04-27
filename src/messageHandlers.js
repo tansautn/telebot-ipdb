@@ -1,21 +1,17 @@
 /*
+ *          M""""""""`M            dP
+ *          Mmmmmm   .M            88
+ *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *          MMP  .MMMMM  88    88  88888"    88'  `88
+ *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *          M         M  `88888P'  dP   `YP  `88888P'
+ *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
  *
- * 			   M""""""""`M            dP
- *             Mmmmmm   .M            88
- *             MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *             MMP  .MMMMM  88    88  88888"    88'  `88
- *             M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *             M         M  `88888P'  dP   `YP  `88888P'
- *             MMMMMMMMMMM    -*-  Created by Zuko  -*-
- *
- *
- *             * * * * * * * * * * * * * * * * * * * * *
- *             * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *             * -  Copyright © 2025 (Z) Programing  - *
- *             *    -  -  All Rights Reserved  -  -    *
- *             * * * * * * * * * * * * * * * * * * * * *
- *
- *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
+ *          *    -  -  All Rights Reserved  -  -    *
+ *          * * * * * * * * * * * * * * * * * * * * *
  */
 
 // messageHandlers.js
@@ -42,7 +38,7 @@ import {
   THU_CHI_COLS,
   SHEET_NAME_THU_CHI,
   insertRow,
-  updateRow, getSheetData
+  updateRow, getSheetData, getStartOfWeek, getStartOfMonth, getAccountStats, groupDataByPeriod
 } from './googleSheetsUtils';
 
 export async function startCommand(body) {
@@ -548,13 +544,14 @@ export async function handleQueryCommand(body) {
 
 export async function handleDepositCommand(body) {
   const chatId = body.message.chat.id;
-  const args = body.message.text.trim().split(/\s+/);
-  const command = args[0].toLowerCase();
+  const text = body.message.text.trim();
+  const [commandPart, notePart] = text.split('|').map(part => part.trim());
+  const args = commandPart.split(/\s+/);
 
   if (args.length < 3) {
     await bot.message.sendMessage({
       chat_id: chatId,
-      text: 'Sử dụng: /dep <acc> <amount> [site]'
+      text: 'Sử dụng: /dep <acc> <amount> [site] | [note]'
     });
     return;
   }
@@ -629,6 +626,9 @@ export async function handleDepositCommand(body) {
       newRow[2] = acc; // Column C - Acc 
       newRow[3] = amount.toString(); // Column D - Deposit
       newRow[5] = `=SUM(E${lastDataRow + 2},-D${lastDataRow + 2})`; // Column F - Profit
+      if (notePart) {
+        newRow[6] = notePart; // Column G - Note
+      }
       newRow = _addDateTimeToRow(newRow)
       await insertRow(lastDataRow + 2, newRow);
     } else {
@@ -638,21 +638,19 @@ export async function handleDepositCommand(body) {
       newRow[2] = acc;
       newRow[3] = amount.toString();
       newRow[5] = `=SUM(E${lastDataRow + 1},-D${lastDataRow + 1})`; // Column F - Profit
+      if (notePart) {
+        newRow[6] = notePart; // Column G - Note
+      }
       newRow = _addDateTimeToRow(newRow)
       await insertRow(lastDataRow + 1, newRow);
     }
 
     await bot.message.sendMessage({
       chat_id: chatId,
-      text: `✅ Đã thêm deposit:\nAcc: ${acc}\nAmount: ${amount}\nSite: ${site || 'N/A'}`
+      text: `✅ Đã thêm deposit:\nAcc: ${acc}\nAmount: ${amount}\nSite: ${site || 'N/A'}${notePart ? '\nNote: ' + notePart : ''}`
     });
   } catch (error) {
     console.error('Error in handleDepositCommand:', error);
-    const stackString = error.stack;
-
-    // Chuyển đổi thành mảng (tách theo dòng mới)
-    const stackArray = stackString.split('\n').map(line => line.trim());
-    console.log('STACK ARRAY', stackArray);
     await bot.message.sendMessage({
       chat_id: chatId,
       text: 'Có lỗi xảy ra khi thêm deposit'
@@ -663,20 +661,20 @@ export async function handleDepositCommand(body) {
 export async function handleBetCommand(body) {
   const chatId = body.message.chat.id;
   const text = body.message.text.trim();
-  const firstLine = text.split('\n')[0];
-  const args = firstLine.split(/\s+/);
+  const [commandPart, notePart] = text.split('|').map(part => part.trim());
+  const args = commandPart.split(/\s+/);
 
   if (args.length < 4) {
     await bot.message.sendMessage({
       chat_id: chatId,
-      text: 'Sử dụng: /bet <acc> <site> <amount>'
+      text: 'Sử dụng: /bet <acc> <site> <amount> | [note]'
     });
     return;
   }
 
   const acc = args[1].toLowerCase();
   const site = ['b9', 'vnd'].includes(args[2].toLowerCase()) ? '' : args[2];
-  const amount = text.substring(text.indexOf(args[3]));
+  const amount = commandPart.substring(commandPart.indexOf(args[3]));
 
   try {
     // Find matching row
@@ -690,17 +688,20 @@ export async function handleBetCommand(body) {
       return;
     }
 
-    // Update the bet amount
+    // Update the bet amount and note
     const data = await getSheetData(SHEET_NAME_THU_CHI);
     const row = data[rowIndex - HEADER_ROW - 1];
     row[8] = (new Date()); // Column I - Date_Converted
     row[10] = amount; // Column K - Bet Amount
+    if (notePart) {
+      row[6] = notePart; // Column G - Note
+    }
     
     await updateRow(rowIndex, row, SHEET_NAME_THU_CHI);
 
     await bot.message.sendMessage({
       chat_id: chatId,
-      text: `✅ Đã cập nhật bet amount:\nAcc: ${acc}\nSite: ${site || 'N/A'}\nAmount: ${amount}`
+      text: `✅ Đã cập nhật bet amount:\nAcc: ${acc}\nSite: ${site || 'N/A'}\nAmount: ${amount}${notePart ? '\nNote: ' + notePart : ''}`
     });
   } catch (error) {
     console.error('Error in handleBetCommand:', error);
@@ -713,12 +714,14 @@ export async function handleBetCommand(body) {
 
 export async function handleOutCommand(body) {
   const chatId = body.message.chat.id;
-  const args = body.message.text.trim().split(/\s+/);
+  const text = body.message.text.trim();
+  const [commandPart, notePart] = text.split('|').map(part => part.trim());
+  const args = commandPart.split(/\s+/);
 
   if (args.length < 3) {
     await bot.message.sendMessage({
       chat_id: chatId,
-      text: 'Sử dụng: /out <acc> <amount_out> [amount_in] [site]'
+      text: 'Sử dụng: /out <acc> <amount_out> [amount_in] [site] | [note]'
     });
     return;
   }
@@ -758,11 +761,14 @@ export async function handleOutCommand(body) {
       newRow[2] = acc;
       newRow[4] = amountOut.toString(); // Column E - Out
       newRow[5] = `=SUM(E${lastDataRow + 1},-D${lastDataRow + 1})`; // Column F - Profit
+      if (notePart) {
+        newRow[6] = notePart; // Column G - Note
+      }
       newRow = _addDateTimeToRow(newRow)
       await insertRow(lastDataRow + 1, newRow);
       await bot.message.sendMessage({
         chat_id: chatId,
-        text: `✅ Đã thêm withdrawal mới:\nAcc: ${acc}\nAmount out: ${amountOut}\nSite: ${site || 'N/A'}`
+        text: `✅ Đã thêm withdrawal mới:\nAcc: ${acc}\nAmount out: ${amountOut}\nSite: ${site || 'N/A'}${notePart ? '\nNote: ' + notePart : ''}`
       });
       return;
     }
@@ -802,7 +808,7 @@ export async function handleOutCommand(body) {
       // Create inline keyboard for selection
       const keyboard = recentDeposits.map(dep => [{
         text: `${dep.date} | ${dep.site} | ${dep.amount}`,
-        callback_data: `out:${acc}:${amountOut}:${dep.rowIndex}`
+        callback_data: `out:${acc}:${amountOut}:${dep.rowIndex}${notePart ? ':' + notePart : ''}`
       }]);
 
       await bot.message.sendMessage({
@@ -830,12 +836,15 @@ export async function handleOutCommand(body) {
     
     // Add profit formula
     row[5] = `=SUM(E${rowIndex},-D${rowIndex})`; // Column F - Profit
+    if (notePart) {
+      row[6] = notePart; // Column G - Note
+    }
     
     await updateRow(rowIndex, row, SHEET_NAME_THU_CHI);
 
     await bot.message.sendMessage({
       chat_id: chatId,
-      text: `✅ Đã cập nhật withdrawal:\nAcc: ${acc}\nAmount out: ${amountOut}`
+      text: `✅ Đã cập nhật withdrawal:\nAcc: ${acc}\nAmount out: ${amountOut}${notePart ? '\nNote: ' + notePart : ''}`
     });
   } catch (error) {
     console.error('Error in handleOutCommand:', error);
@@ -895,3 +904,323 @@ export async function handleNoteCommand(body) {
     });
   }
 }
+
+
+export async function handleStatsCommand(body) {
+  console.log('handleStatsCommand', body);
+  const chatId = body.message.chat.id;
+  const args = body.message.text.trim().split(/\s+/);
+  const command = args[0].toLowerCase();
+  const acc = args.length > 2 ? args[2].toLowerCase() : null;
+  let site = args.length > 1 ? args[1] : null;
+  if (site === null || site.toString().toLowerCase() === 'n/a') {
+    site = '';
+  }
+
+  try {
+    const data = await getSheetData(SHEET_NAME_THU_CHI);
+    const now = new Date();
+    now.setHours(now.getHours() + 7); // Convert to UTC+7
+
+    // Get time periods
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    const thisWeekStart = getStartOfWeek(now);
+    const lastWeekStart = new Date(thisWeekStart);
+    // ??? is it correct when lastWeekStart.getDate() <= 7?
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+    const thisMonthStart = getStartOfMonth(now);
+
+    // If specific account stats requested
+    if (acc) {
+      if (!site && site !== '') {
+        await bot.message.sendMessage({
+          chat_id: chatId,
+          text: 'Vui lòng cung cấp site khi xem thống kê tài khoản cụ thể.\nSử dụng: /stats <acc> <site>'
+        });
+        return;
+      }
+
+      const stats = getAccountStats(data, acc, site);
+      const monthStats = await groupDataByPeriod(data, thisMonthStart);
+      const weekStats = await groupDataByPeriod(data, thisWeekStart);
+      const todayStats = await groupDataByPeriod(data, today);
+
+      let message = `📊 *Thống kê cho ${acc} (${site})*\n\n`;
+
+      // All-time stats
+      message += '*🕒 Tổng thời gian:*\n';
+      message += `- Tổng deposit: ${stats.totalDeposit.toLocaleString()}\n`;
+      message += `- Tổng profit: ${stats.totalProfit.toLocaleString()} (${stats.profitPercentage.toFixed(2)}%)\n`;
+      message += `- Số ngày từ lần cuối deposit: ${stats.lastDepositDays}\n\n`;
+
+      // This month stats
+      const monthSiteStats = monthStats.deposits[site]?.[acc];
+      const monthProfitStats = monthStats.profits[site]?.[acc];
+      if (monthSiteStats) {
+        message += '*📅 Tháng này:*\n';
+        message += `- Deposit: ${monthSiteStats.toLocaleString()}\n`;
+        message += `- Profit: ${monthProfitStats.toLocaleString()}\n\n`;
+      }
+
+      // This week stats
+      const weekSiteStats = weekStats.deposits[site]?.[acc];
+      const weekProfitStats = weekStats.profits[site]?.[acc];
+      if (weekSiteStats) {
+        message += '*📅 Tuần này:*\n';
+        message += `- Deposit: ${weekSiteStats.toLocaleString()}\n`;
+        message += `- Profit: ${weekProfitStats.toLocaleString()}\n\n`;
+      }
+
+      // Today stats
+      const todaySiteStats = todayStats.deposits[site]?.[acc];
+      const todayProfitStats = todayStats.profits[site]?.[acc];
+      if (todaySiteStats) {
+        message += '*📅 Hôm nay:*\n';
+        message += `- Deposit: ${todaySiteStats.toLocaleString()}\n`;
+        message += `- Profit: ${todayProfitStats.toLocaleString()}\n\n`;
+      }
+
+      // Recent activities
+      message += '*🔄 Hoạt động gần đây:*\n';
+      stats.recentActivities.forEach(activity => {
+        message += `${activity.date}: `;
+        if (activity.deposit) message += `Dep ${activity.deposit.toLocaleString()} `;
+        if (activity.out) message += `Out ${activity.out.toLocaleString()} `;
+        if (activity.profit) message += `Profit ${activity.profit.toLocaleString()} `;
+        if (activity.betAmount) message += `Bet ${activity.betAmount} `;
+        if (activity.note) message += `Note: ${activity.note}`;
+        message += '\n';
+      });
+
+      // Send in chunks if too long
+      await ensureMessageLength(chatId, message);
+      return;
+    }
+    let specificSite;
+    if (site || site === '') {
+      specificSite = site === '' ? 'N/A' : site;
+    }
+    const monthStats = await groupDataByPeriod(data, thisMonthStart);
+    const thisWeekStats = await groupDataByPeriod(data, thisWeekStart);
+    const lastWeekStats = await groupDataByPeriod(data, lastWeekStart);
+    const todayStats = await groupDataByPeriod(data, today);
+
+    let message = '📊 *Thống kê chung*\n\n';
+
+    // This month stats
+    message += '*📅 Tháng này:*\n';
+    console.log('monthStats', monthStats);
+    Object.entries(monthStats.deposits).forEach(([site, accounts]) => {
+      if (specificSite && site != specificSite) {
+        return;
+      }
+      message += `\n*${site}:*\n`;
+      Object.entries(accounts).forEach(([acc, deposit]) => {
+        const profit = monthStats.profits[site][acc];
+        const profitPercentage = deposit > 0 ? (profit / deposit) * 100 : 0;
+        message += `- ${acc}: Dep ${deposit.toLocaleString()} | Profit ${profit.toLocaleString()} (${profitPercentage.toFixed(2)}%)\n`;
+      });
+    });
+    message += `\nTổng: Dep ${monthStats.totalDeposit.toLocaleString()} | Profit ${monthStats.totalProfit.toLocaleString()}\n\n`;
+
+    // This week vs last week
+    message += '*📅 Tuần này vs Tuần trước:*\n';
+    Object.entries(thisWeekStats.deposits).forEach(([site, accounts]) => {
+      if (specificSite && site != specificSite) {
+        return;
+      }
+      message += `\n*${site}:*\n`;
+      Object.entries(accounts).forEach(([acc, deposit]) => {
+        const thisWeekProfit = thisWeekStats.profits[site][acc];
+        const lastWeekDeposit = lastWeekStats.deposits[site]?.[acc] || 0;
+        const lastWeekProfit = lastWeekStats.profits[site]?.[acc] || 0;
+
+        message += `- ${acc}:\n`;
+        message += `  Tuần này: Dep ${deposit.toLocaleString()} | Profit ${thisWeekProfit.toLocaleString()}\n`;
+        if (lastWeekDeposit > 0) {
+          message += `  Tuần trước: Dep ${lastWeekDeposit.toLocaleString()} | Profit ${lastWeekProfit.toLocaleString()}\n`;
+        }
+      });
+    });
+
+    // Today stats
+    message += '\n*📅 Hôm nay:*\n';
+    Object.entries(todayStats.deposits).forEach(([site, accounts]) => {
+      if (specificSite && site != specificSite) {
+        return;
+      }
+      message += `\n*${site}:*\n`;
+      Object.entries(accounts).forEach(([acc, deposit]) => {
+        const profit = todayStats.profits[site][acc];
+        message += `- ${acc}: Dep ${deposit.toLocaleString()} | Profit ${profit.toLocaleString()}\n`;
+      });
+    });
+
+    // Find accounts with no deposits
+    let noDepositMessage = '\n*⚠️ Tài khoản chưa có deposit:*\n';
+    Object.entries(monthStats.deposits).forEach(([site, accounts]) => {
+      if (specificSite && site != specificSite) {
+        return;
+      }
+      const noDepAccounts = Object.entries(accounts)
+          .filter(([, deposit]) => deposit === 0)
+          .map(([acc]) => acc);
+
+      if (noDepAccounts.length > 0) {
+        noDepositMessage += `\n*${site}:* ${noDepAccounts.join(', ')}`;
+      }
+    });
+    message += noDepositMessage;
+
+    // Send in chunks if too long
+    await ensureMessageLength(chatId, message);
+    // return await generalStatsResponse();
+  } catch (error) {
+    console.error('Error in handleStatsCommand:', error);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi lấy thống kê'
+    });
+  }
+}
+
+async function ensureMessageLength(chatId, message, maxLength = 3900) {
+  if (message.length <= maxLength) {
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: message,
+      parse_mode: 'Markdown'
+    });
+  } else {
+    // Split message into chunks
+    for (let i = 0; i < message.length; i += maxLength) {
+      const chunk = message.substring(i, i + maxLength);
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: chunk,
+        parse_mode: 'Markdown'
+      });
+    }
+  }
+}
+
+export async function generalStatsResponse(body) {
+  const chatId = body.message.chat.id;
+  const args = body.message.text.trim().split(/\s+/);
+  const command = args[0].toLowerCase();
+  const acc = args.length > 2 ? args[2].toLowerCase() : null;
+  let site = args.length > 1 ? args[1] : null;
+  if (site === null || site.toString().toLowerCase() === 'n/a') {
+    site = '';
+  }
+
+  try {
+    const data = await getSheetData(SHEET_NAME_THU_CHI);
+    const now = new Date();
+    now.setHours(now.getHours() + 7); // Convert to UTC+7
+
+    // Get time periods
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    const thisWeekStart = getStartOfWeek(now);
+    const lastWeekStart = new Date(thisWeekStart);
+    // ??? is it correct when lastWeekStart.getDate() <= 7?
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+    const thisMonthStart = getStartOfMonth(now);
+// General stats
+    const monthStats = await groupDataByPeriod(data, thisMonthStart);
+    const thisWeekStats = await groupDataByPeriod(data, thisWeekStart);
+    const lastWeekStats = await groupDataByPeriod(data, lastWeekStart);
+    const todayStats = await groupDataByPeriod(data, today);
+    console.log('monthStats', thisMonthStart, monthStats);
+    console.log('thisWeekStats', thisWeekStart, thisWeekStats);
+
+    let message = '📊 *Thống kê chung*\n\n';
+
+    // This month stats
+    message += '*📅 Tháng này:*\n';
+    Object.entries(monthStats.deposits).forEach(([site, accounts]) => {
+      message += `\n*${site}:*\n`;
+      Object.entries(accounts).forEach(([acc, deposit]) => {
+        const profit = monthStats.profits[site][acc];
+        const profitPercentage = deposit > 0 ? (profit / deposit) * 100 : 0;
+        message += `- ${acc}: Dep ${deposit.toLocaleString()} | Profit ${profit.toLocaleString()} (${profitPercentage.toFixed(2)}%)\n`;
+      });
+    });
+    message += `\nTổng: Dep ${monthStats.totalDeposit.toLocaleString()} | Profit ${monthStats.totalProfit.toLocaleString()}\n\n`;
+
+    // This week vs last week
+    message += '*📅 Tuần này vs Tuần trước:*\n';
+    Object.entries(thisWeekStats.deposits).forEach(([site, accounts]) => {
+      message += `\n*${site}:*\n`;
+      Object.entries(accounts).forEach(([acc, deposit]) => {
+        const thisWeekProfit = thisWeekStats.profits[site][acc];
+        const lastWeekDeposit = lastWeekStats.deposits[site]?.[acc] || 0;
+        const lastWeekProfit = lastWeekStats.profits[site]?.[acc] || 0;
+
+        message += `- ${acc}:\n`;
+        message += `  Tuần này: Dep ${deposit.toLocaleString()} | Profit ${thisWeekProfit.toLocaleString()}\n`;
+        if (lastWeekDeposit > 0) {
+          message += `  Tuần trước: Dep ${lastWeekDeposit.toLocaleString()} | Profit ${lastWeekProfit.toLocaleString()}\n`;
+        }
+      });
+    });
+
+    // Today stats
+    message += '\n*📅 Hôm nay:*\n';
+    Object.entries(todayStats.deposits).forEach(([site, accounts]) => {
+      message += `\n*${site}:*\n`;
+      Object.entries(accounts).forEach(([acc, deposit]) => {
+        const profit = todayStats.profits[site][acc];
+        message += `- ${acc}: Dep ${deposit.toLocaleString()} | Profit ${profit.toLocaleString()}\n`;
+      });
+    });
+
+    // Find accounts with no deposits
+    let noDepositMessage = '\n*⚠️ Tài khoản chưa có deposit:*\n';
+    Object.entries(monthStats.deposits).forEach(([site, accounts]) => {
+      const noDepAccounts = Object.entries(accounts)
+          .filter(([, deposit]) => deposit === 0)
+          .map(([acc]) => acc);
+
+      if (noDepAccounts.length > 0) {
+        noDepositMessage += `\n*${site}:* ${noDepAccounts.join(', ')}`;
+      }
+    });
+    message += noDepositMessage;
+
+    // Send in chunks if too long
+    const maxLength = 4096;
+    if (message.length <= maxLength) {
+      await bot.message.sendMessage({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown'
+      });
+    } else {
+      // Split message into chunks
+      for (let i = 0; i < message.length; i += maxLength) {
+        const chunk = message.substring(i, i + maxLength);
+        await bot.message.sendMessage({
+          chat_id: chatId,
+          text: chunk,
+          parse_mode: 'Markdown'
+        });
+      }
+    }
+    // return await generalStatsResponse();
+  } catch (error) {
+    console.error('Error in handleStatsCommand:', error);
+    await bot.message.sendMessage({
+      chat_id: chatId,
+      text: 'Có lỗi xảy ra khi lấy thống kê'
+    });
+  }
+}
+
+

@@ -1,21 +1,17 @@
 /*
+ *          M""""""""`M            dP
+ *          Mmmmmm   .M            88
+ *          MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
+ *          MMP  .MMMMM  88    88  88888"    88'  `88
+ *          M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
+ *          M         M  `88888P'  dP   `YP  `88888P'
+ *          MMMMMMMMMMM    -*-  Created by Zuko  -*-
  *
- * 			   M""""""""`M            dP
- *             Mmmmmm   .M            88
- *             MMMMP  .MMM  dP    dP  88  .dP   .d8888b.
- *             MMP  .MMMMM  88    88  88888"    88'  `88
- *             M' .MMMMMMM  88.  .88  88  `8b.  88.  .88
- *             M         M  `88888P'  dP   `YP  `88888P'
- *             MMMMMMMMMMM    -*-  Created by Zuko  -*-
- *
- *
- *             * * * * * * * * * * * * * * * * * * * * *
- *             * -    - -   F.R.E.E.M.I.N.D   - -    - *
- *             * -  Copyright © 2025 (Z) Programing  - *
- *             *    -  -  All Rights Reserved  -  -    *
- *             * * * * * * * * * * * * * * * * * * * * *
- *
- *
+ *          * * * * * * * * * * * * * * * * * * * * *
+ *          * -    - -   F.R.E.E.M.I.N.D   - -    - *
+ *          * -  Copyright © 2025 (Z) Programing  - *
+ *          *    -  -  All Rights Reserved  -  -    *
+ *          * * * * * * * * * * * * * * * * * * * * *
  */
 
 import {router} from './flaregram/utils/router';
@@ -33,7 +29,8 @@ import {
   handleDepositCommand,
   handleOutCommand,
   handleNoteCommand,
-  handleBetCommand
+    handleBetCommand,
+    handleStatsCommand, generalStatsResponse
 } from './messageHandlers';
 import {
   deleteByIP,
@@ -182,6 +179,9 @@ export async function updateHandler(obj) {
           break;
         case command === '/bet':
           await handleBetCommand(obj);
+            break;
+          case command === '/stats':
+              await handleStatsCommand(obj);
           break;
         default:
           await handleIPMessage(obj);
@@ -288,10 +288,10 @@ router.any('/dev', async function (request) {
   if (!request.headers.has('X-Zuko-Debug')) {
       return new Response('Unauthorized', { status: 401 });
   }
-  const obj = {
-    "update_id": 535670557,
+    const body = {
+        "update_id": 535673359,
     "message": {
-      "message_id": 991,
+        "message_id": 3020,
       "from": {
         "id": 1276300124,
         "is_bot": false,
@@ -301,24 +301,17 @@ router.any('/dev', async function (request) {
         "language_code": "en"
       },
       "chat": {
-        "id": -1002213557605,
-        "title": "IPDB",
+          "id": -1002300997698,
+          "title": "Ƶ𝔲𝔨𝔬 and ipdbz",
         "type": "supergroup"
       },
-      "date": 1728017637,
-      "document": {
-        "file_name": "VN_vpn438373355.ovpn",
-        "mime_type": "application/octet-stream",
-        "file_id": "BQACAgUAAyEFAASD8DVlAAID32b_dOVw5B3dlQhqMNIH5Gd-C4ESAAKGDwAC5OMBVCNV_yCyt1bvNgQ",
-        "file_unique_id": "AgADhg8AAuTjAVQ",
-        "file_size": 9433
-      },
-      "caption": "tfo"
+        "date": 1745734484,
+        "text": "/stats i9",
+        "entities": [["Object"]]
     }
   };
-  let rs = await handleOVPNFile(obj);
-  return rs;
-  return new Response(JSON.stringify({ ok: true ,input: obj}), { status: 200 });
+    await handleStatsCommand(body)
+    return new Response(JSON.stringify({ok: true}), {status: 200});
 })
 router.any('/api/*', apiHandler);
 

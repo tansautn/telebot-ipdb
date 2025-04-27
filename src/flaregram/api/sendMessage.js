@@ -58,15 +58,12 @@ export async function f_sendMessage(body) {
     protect_content: param_protect_content,
     parse_mode: param_parse_mode
   };
-    console.trace();
-    console.log(JSON.stringify(payload));
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-    const aa = await response.clone().json();
-    console.log(aa);
+    // const aa = await response.clone().json();
   if (!response.ok) {
     console.error('Error sending message:', response.status, response.statusText);
 
