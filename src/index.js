@@ -170,7 +170,7 @@ export async function updateHandler(obj) {
         case command === '/query':
           await handleQueryCommand(obj);
           break;
-        case command === '/fetch':
+        case command === '/fetch' || command === '/f':
           await handleFetchCommand(obj);
           break;
         case command === '/dep' || command === '/add':
