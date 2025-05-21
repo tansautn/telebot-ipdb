@@ -29,8 +29,10 @@ import {
   handleDepositCommand,
   handleOutCommand,
   handleNoteCommand,
-    handleBetCommand,
-    handleStatsCommand, generalStatsResponse
+  handleBetCommand,
+  handleStatsCommand,
+  generalStatsResponse,
+  handleFetchCommand
 } from './messageHandlers';
 import {
   deleteByIP,
@@ -168,6 +170,9 @@ export async function updateHandler(obj) {
         case command === '/query':
           await handleQueryCommand(obj);
           break;
+        case command === '/fetch':
+          await handleFetchCommand(obj);
+          break;
         case command === '/dep' || command === '/add':
           await handleDepositCommand(obj);
           break;
@@ -179,9 +184,9 @@ export async function updateHandler(obj) {
           break;
         case command === '/bet':
           await handleBetCommand(obj);
-            break;
-          case command === '/stats':
-              await handleStatsCommand(obj);
+          break;
+        case command === '/stats':
+          await handleStatsCommand(obj);
           break;
         default:
           await handleIPMessage(obj);

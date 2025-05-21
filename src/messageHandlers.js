@@ -1223,4 +1223,129 @@ export async function generalStatsResponse(body) {
   }
 }
 
+export async function handleFetchCommand(body) {
+    const chatId = body.message.chat.id;
+    const args = body.message.text.split(' ');
+
+    // Kiểm tra xem có tham số label hay không
+    if (args.length < 2) {
+        await bot.message.sendMessage({
+            chat_id: chatId,
+            text: 'Vui lòng cung cấp label để tìm kiếm. Ví dụ: /fetch bl'
+        });
+        return;
+    }
+
+    const label = args[1];
+
+    try {
+        // Gọi API để lấy danh sách VPN server sống ở Việt Nam
+        const response = await apiReq(`/data/vpn?country_short=VN&is_alive=1&limit=10&withContent=1&sortBy=checked_at&sortDirection=desc`, null, 'GET');
+        const data = await response.json();
+
+        if (!data.ok || !data.data || data.data.length === 0) {
+            await bot.message.sendMessage({
+                chat_id: chatId,
+                text: `Không tìm thấy VPN server nào đang hoạt động ở Việt Nam`
+            });
+            return;
+        }
+
+        let foundUnusedServer = false;
+        let totalProcessed = 0;
+        let skipped = 0;
+        let msgs = [];
+        msgs.push(await bot.message.sendMessage({
+            chat_id: chatId,
+            text: `Đang tìm kiếm VPN server cho label "${label}"...`
+        }));
+
+        // Kiểm tra từng server xem đã có trong IP DB chưa
+        for (const server of data.data) {
+            totalProcessed++;
+
+            // Kiểm tra IP đã tồn tại trong DB chưa, sử dụng hàm ipExists
+            if (await ipExists(server.host)) {
+                skipped++;
+                continue;
+            }
+
+            // IP chưa tồn tại, thêm vào với label đã chỉ định
+            foundUnusedServer = true;
+
+            // Tạo input object cho hàm storeIP
+            const input = {
+                ip: server.host,
+                acc: label
+            };
+
+            // Lưu IP với label
+            const meta = await storeIP(input);
+            msgs.push(await bot.message.sendMessage({
+                chat_id: chatId,
+                text: `Đã lưu: ${server.host} với acc: ${label}${meta.lastIncrementValue}`,
+                parse_mode: "markdown",
+            }));
+
+            // Gửi file cấu hình OpenVPN
+            try {
+                // Lấy nội dung cấu hình
+                const configContent = server.config_file_content;
+
+                if (!configContent) {
+                    continue;
+                }
+
+                // Tạo tên file dựa trên label và giá trị increment
+                const fileName = `${label}${meta.lastIncrementValue}.ovpn`;
+
+                // Tạo file từ nội dung cấu hình
+                const encoder = new TextEncoder();
+                const fileData = encoder.encode(configContent);
+
+                const file = new File([fileData], fileName, {
+                    type: 'application/x-openvpn-profile'
+                });
+
+                // Gửi file sử dụng FormData
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('document', file);
+                formData.append('caption', `VPN Config for ${fileName.replace('.ovpn', '')}`);
+
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // Dừng vòng lặp sau khi tìm thấy 1 server
+                break;
+            } catch (error) {
+                console.error('Error sending VPN file:', error);
+                await bot.message.sendMessage({
+                    chat_id: chatId,
+                    text: `Có lỗi xảy ra khi gửi file cấu hình: ${error.message}`
+                });
+            }
+        }
+        for (let i = 0; i < msgs.length; i++) {
+            let message = msgs[i].result;
+            await bot.message.deleteMessages({chat_id: chatId, message_id: message.message_id});
+        }
+        // Nếu không tìm thấy server nào có thể sử dụng
+        if (!foundUnusedServer) {
+            await bot.message.sendMessage({
+                chat_id: chatId,
+                text: `Không tìm thấy VPN server nào chưa được sử dụng. Đã kiểm tra ${totalProcessed} server (bỏ qua ${skipped} server đã tồn tại). Vui lòng thử lại sau.`
+            });
+        }
+    } catch (error) {
+        console.error('Error in handleFetchCommand:', error);
+        await bot.message.sendMessage({
+            chat_id: chatId,
+            text: 'Có lỗi xảy ra khi tìm kiếm VPN server. ' + error.message
+        });
+    }
+}
+
 

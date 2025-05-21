@@ -46,7 +46,6 @@ export async function getMetaData(data, isThuChi = false) {
         acc && accs.add(acc);
         lastIncrements[acc] = Math.max(lastIncrements[acc] || 0, incrementValue);
     });
-    console.log(Array.from(accs), lastIncrements);
     return {
         accs: Array.from(accs),
         lastIncrements,
@@ -89,7 +88,7 @@ export async function apiUpdateAccForIp(ip, acc, meta) {
     try {
         const res = await apiReq('/tools/ovpn/label', {ip: ip, label: acc, meta: meta});
         const jsonData = await res.json();
-        console.log('API update response:', jsonData);
+        console.log('API apiUpdateAccForIp response:', jsonData);
         return jsonData;
     } catch (error) {
         console.error('Error in apiUpdateAccForIp:', error);
