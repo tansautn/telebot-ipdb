@@ -1237,10 +1237,10 @@ export async function handleFetchCommand(body) {
     }
 
     const label = args[1];
-
+  const page = args[2] || 1;
     try {
         // Gọi API để lấy danh sách VPN server sống ở Việt Nam
-        const response = await apiReq(`/data/vpn?country_short=VN&is_alive=1&limit=10&withContent=1&sortBy=checked_at&sortDirection=desc`, null, 'GET');
+      const response = await apiReq(`/data/vpn?country_short=VN&is_alive=1&limit=10&withContent=1&sortBy=checked_at&sortDirection=desc&page=${page}`, null, 'GET');
         const data = await response.json();
 
         if (!data.ok || !data.data || data.data.length === 0) {
