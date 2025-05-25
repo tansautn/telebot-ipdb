@@ -195,6 +195,35 @@ export async function handleCallbackQuery(callbackQuery) {
     await bot.message.sendMessage(messageParams);
   } else if (action === 'vpn') {
     const [vpnId] = params;
+
+    // Xử lý nút Cancel
+    if (vpnId === 'cancel') {
+      await deleteKeyboardMessage(chatId, messageId);
+      return await bot.message.answerCallbackQuery({id: id, text: 'Đã huỷ thao tác'});
+    }
+
+    // Xử lý nút New (vpnId sẽ bắt đầu bằng 'new_')
+    if (vpnId && vpnId.startsWith('new_')) {
+      // Trích xuất label từ vpnId (format: new_label)
+      const fullLabel = vpnId.substring(4); // Cắt bỏ 'new_'
+
+      // Trích xuất phần label cơ bản (bỏ số ở cuối nếu có)
+      const baseLabel = fullLabel.replace(/\d+$/, '');
+
+      // Xóa message keyboard hiện tại
+      await deleteKeyboardMessage(chatId, messageId);
+
+      // Chuyển tiếp đến handleFetchCommand với label cơ bản
+      const fetchBody = {
+        message: {
+          chat: {id: chatId},
+          text: `/fetch ${baseLabel}`
+        }
+      };
+
+      await handleFetchCommand(fetchBody);
+      return await bot.message.answerCallbackQuery({id: id});
+    }
     
     try {
       // Lấy nội dung file VPN
@@ -227,7 +256,7 @@ export async function handleCallbackQuery(callbackQuery) {
       // Append required parameters to FormData
       formData.append('chat_id', chatId);
       formData.append('document', file);
-      formData.append('caption', `VPN Config for ${label}`);
+      formData.append('caption', `${label} | ${data.data.host} | Speed: ${data.data.speed} | Ping: ${data.data.latency}`);
 
       // Send using POST request
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
@@ -235,10 +264,7 @@ export async function handleCallbackQuery(callbackQuery) {
         body: formData
       });
       // Xóa message chọn VPN
-      await bot.message.deleteMessages({
-        chat_id: chatId,
-        message_id: messageId
-      });
+      await deleteKeyboardMessage(chatId, messageId);
     } catch (error) {
       console.error('Error sending VPN file:', error);
       await bot.message.sendMessage({
@@ -499,11 +525,11 @@ export async function handleQueryCommand(body) {
     const data = await response.json();
 
     if (!data.ok || !data.data || data.data.length === 0) {
-      await bot.message.sendMessage({
-        chat_id: chatId,
-        text: `Không tìm thấy VPN nào cho label "${label}"`
-      });
-      return;
+      // await bot.message.sendMessage({
+      //   chat_id: chatId,
+      //   text: `Không tìm thấy VPN nào cho label "${label}"`
+      // });
+      return await handleFetchCommand({message: {chat: {id: chatId}, text: `/fetch ${label}`}});
     }
 
     // Lấy 5 item đầu tiên
@@ -517,13 +543,25 @@ export async function handleQueryCommand(body) {
       }
       console.log('metadata', metadata);
       const incrementValue = metadata.increment_value || metadata.lastIncrementValue;
-      const buttonLabel = `${label}${incrementValue} | ${item.host} | ${item.checked_at}`;
+      const buttonLabel = `${label}${incrementValue} | ${item.host} | ${item.checked_at} | S: ${item.speed} | P: ${item.latency}`;
       
       return [{
         text: buttonLabel,
         callback_data: `vpn:${item.id}`
       }];
     });
+
+    // Thêm nút New và Cancel
+    keyboard.push([
+      {
+        text: 'New',
+        callback_data: `vpn:new_${label}`
+      },
+      {
+        text: 'Cancel',
+        callback_data: 'vpn:cancel'
+      }
+    ]);
 
     await bot.message.sendMessage({
       chat_id: chatId,
@@ -1240,7 +1278,7 @@ export async function handleFetchCommand(body) {
   const page = args[2] || 1;
     try {
         // Gọi API để lấy danh sách VPN server sống ở Việt Nam
-      const response = await apiReq(`/data/vpn?country_short=VN&is_alive=1&limit=10&withContent=1&sortBy=checked_at&sortDirection=desc&page=${page}`, null, 'GET');
+      const response = await apiReq(`/data/vpn?country_short=VN&is_alive=1&limit=15&withContent=1&sortBy=checked_at&sortDirection=desc&page=${page}`, null, 'GET');
         const data = await response.json();
 
         if (!data.ok || !data.data || data.data.length === 0) {
@@ -1311,7 +1349,7 @@ export async function handleFetchCommand(body) {
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
                 formData.append('document', file);
-                formData.append('caption', `VPN Config for ${fileName.replace('.ovpn', '')}`);
+              formData.append('caption', `${fileName.replace('.ovpn', '')} | ${server.host} | Speed: ${server.speed} | Ping: ${server.latency}`);
 
                 await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
                     method: 'POST',
@@ -1346,6 +1384,20 @@ export async function handleFetchCommand(body) {
             text: 'Có lỗi xảy ra khi tìm kiếm VPN server. ' + error.message
         });
     }
+}
+
+// New exportable function to handle keyboard message deletion
+export async function deleteKeyboardMessage(chatId, messageId) {
+  try {
+    await bot.message.deleteMessages({
+      chat_id: chatId,
+      message_id: messageId
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting keyboard message:', error);
+    return false;
+  }
 }
 
 

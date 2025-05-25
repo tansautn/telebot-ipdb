@@ -167,7 +167,7 @@ export async function updateHandler(obj) {
         case command === '/auth_check':
           await handleAuthCheckCommand(obj);
           break;
-        case command === '/query':
+        case command === '/query' || command === '/q':
           await handleQueryCommand(obj);
           break;
         case command === '/fetch' || command === '/f':
