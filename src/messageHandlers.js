@@ -238,7 +238,7 @@ export async function handleCallbackQuery(callbackQuery) {
       const formData = new FormData();
       // Convert string to Uint8Array for Cloudflare Workers
       const encoder = new TextEncoder();
-      const fileContent = encoder.encode(data.data.connect_config_content);
+      const fileContent = encoder.encode(data.data.config_file_content);
 
       // Gửi file using Uint8Array
       // await bot.message.sendDocument({
@@ -543,7 +543,7 @@ export async function handleQueryCommand(body) {
       }
       console.log('metadata', metadata);
       const incrementValue = metadata.increment_value || metadata.lastIncrementValue;
-      const buttonLabel = `${label}${incrementValue} | ${item.host} | ${item.checked_at} | S: ${item.speed} | P: ${item.latency}`;
+      const buttonLabel = `${label}${incrementValue}|${item.host}|${item.checked_at}|P: ${item.latency}|S: ${item.speed}`;
       
       return [{
         text: buttonLabel,
