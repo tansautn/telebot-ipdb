@@ -165,6 +165,15 @@ export async function handleIPMessage(body, isOvpnFile = false) {
   }
 }
 
+export function generateOvpnFileName(item, label = null) {
+    item = item?.data ? item.data : item;
+    label = label ? label : (item?.label ? item.label : 'NULL');
+    let output = `${label}${item.metadata.increment_value || item.metadata.lastIncrementValue || ''}`;
+    if (item?.country_short && (item.country_short !== 'VN')) {
+        output = `[${item.country_short}] ${output}`;
+    }
+    return output;
+}
 export async function handleCallbackQuery(callbackQuery) {
   const { id, data, message } = callbackQuery;
   const chatId = message.chat.id;
@@ -233,7 +242,7 @@ export async function handleCallbackQuery(callbackQuery) {
       if (!data.ok || !data.data) {
         throw new Error('Failed to get VPN config');
       }
-      const label = data.data.label + `${data.data.metadata.increment_value || data.data.metadata.lastIncrementValue || ''}`;
+        const label = generateOvpnFileName(data);
 // Create FormData and append file
       const formData = new FormData();
       // Convert string to Uint8Array for Cloudflare Workers
@@ -566,7 +575,8 @@ export async function handleQueryCommand(body) {
       }
       console.log('metadata', metadata);
       const incrementValue = metadata.increment_value || metadata.lastIncrementValue;
-      const buttonLabel = `${label}${incrementValue}|${item.host}|${item.checked_at}|P: ${item.latency}|S: ${item.speed}`;
+        const vpnFilename = generateOvpnFileName(item, label)
+        const buttonLabel = `${vpnFilename}|${item.host}|${item.checked_at}|P: ${item.latency}|S: ${item.speed}`;
       
       return [{
         text: buttonLabel,
@@ -1297,8 +1307,13 @@ export async function handleFetchCommand(body) {
     }
 
     const label = args[1];
-    const page = args[2] || 1;
-    const country = args[3] || 'VN';
+    let page = 1, country = 'VN';
+    if (args.length > 2 && !isNaN(parseFloat(args[2]))) {
+        country = args[2].toUpperCase();
+    } else {
+        page = args[2] || 1;
+        country = args[3] || 'VN';
+    }
 
     try {
         const response = await apiReq(`/data/vpn?country_short=${country}&is_alive=1&label=null&limit=15&withContent=1&sortBy=checked_at&sortDirection=desc&page=${page}`, null, 'GET');
