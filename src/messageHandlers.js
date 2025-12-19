@@ -1308,11 +1308,8 @@ export async function handleFetchCommand(body) {
 
     const label = args[1];
     let page = 1, country = 'VN';
-    if (args.length > 2 && !isNaN(parseFloat(args[2]))) {
+    if (args.length > 2 && isNaN(parseFloat(args[2]))) {
         country = args[2].toUpperCase();
-    } else {
-        page = args[2] || 1;
-        country = args[3] || 'VN';
     }
 
     try {
