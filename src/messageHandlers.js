@@ -581,9 +581,28 @@ export async function handleQueryCommand(body) {
         }
 
         // Lấy 5 item đầu tiên
-        const items = data.data.slice(0, 5);
+        /** @type {Array<Object>} */
+        let items = data.data.slice(0, 5);
+        const shouldSortSpeed = Boolean(items.filter(item => item.speed !== -1).length > 0);
 
         // Tạo inline keyboard từ các items
+        items = items
+            .sort((a, b) => {
+                if (a.latency !== b.latency) {
+                    return a.latency - b.latency;
+                }
+            });
+        if (shouldSortSpeed) {
+            items = items.sort((a, b) => {
+                if (a.speed !== b.speed) {
+                    return b.speed - a.speed;
+                }
+            })
+        }
+        items = items.sort((a, b) => {
+            return new Date(b.checked_at) - new Date(a.checked_at);
+        });
+
         const keyboard = items.map(item => {
             let metadata = item.metadata
             if (item.metadata && typeof item.metadata === 'string') {
@@ -598,13 +617,13 @@ export async function handleQueryCommand(body) {
                 month: '2-digit'
             })} ${checkedAtDate.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})}`;
 
-            const hostParts = item.host.split('.');
-            const formattedHost = hostParts.slice(-2).join('.');
-
+            // const hostParts = item.host.split('.');
+            // const formattedHost = hostParts.slice(-2).join('.');
+            const formattedHost = item.host;
             const formattedSpeed = item.speed !== -1 ? `S: ${(item.speed / 1000000).toFixed(2)}Mb` : '';
-            const formattedLatency = item.latency !== -1 ? `${item.latency}` : '';
+            const formattedLatency = item.latency !== -1 ? `${parseInt(item.latency)}` : '';
 
-            const buttonLabel = `${vpnFilename}|${formattedLatency}|${formattedCheckedAt}|${formattedHost}|${formattedSpeed}`;
+            const buttonLabel = `${vpnFilename} | ${formattedLatency} | ${formattedCheckedAt} | ${formattedHost} | ${formattedSpeed}`;
 
             return [{
                 text: buttonLabel,
