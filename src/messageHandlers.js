@@ -586,12 +586,9 @@ export async function handleQueryCommand(body) {
         const shouldSortSpeed = Boolean(items.filter(item => item.speed !== -1).length > 0);
 
         // Tạo inline keyboard từ các items
-        items = items
-            .sort((a, b) => {
-                if (a.latency !== b.latency) {
-                    return a.latency - b.latency;
-                }
-            });
+        items = items.sort((a, b) => {
+            return new Date(b.checked_at) - new Date(a.checked_at);
+        });
         if (shouldSortSpeed) {
             items = items.sort((a, b) => {
                 if (a.speed !== b.speed) {
@@ -600,7 +597,9 @@ export async function handleQueryCommand(body) {
             })
         }
         items = items.sort((a, b) => {
-            return new Date(b.checked_at) - new Date(a.checked_at);
+            if (a.latency !== b.latency) {
+                return a.latency - b.latency;
+            }
         });
 
         const keyboard = items.map(item => {
